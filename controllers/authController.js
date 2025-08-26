@@ -1,107 +1,88 @@
-// TODO: Implement authentication controllers
-// This file will contain user registration, login, logout, and token management logic
+const User = require('../models/User');
+const bcrypt = require('bcryptjs');
+const generateToken = require('../utils/generateToken');
+const { AppError, catchAsync } = require('../middleware/errorMiddleware');
 
-const authController = {
-  // User registration
-  register: async (req, res) => {
-    try {
-      // TODO: Implement user registration logic
-      // - Validate input data
-      // - Hash password
-      // - Create new user
-      // - Generate JWT token
-      // - Send response
-      
-      res.status(201).json({
-        status: 'success',
-        message: 'User registered successfully',
-        data: {
-          user: {
-            id: 'dummy-user-id',
-            name: 'Test User',
-            email: 'test@example.com',
-            role: 'volunteer'
-          },
-          token: 'dummy-jwt-token'
-        }
-      });
-    } catch (error) {
-      res.status(500).json({
-        status: 'error',
-        message: error.message
-      });
-    }
-  },
+// User Registration
+exports.register = catchAsync(async (req, res, next) => {
+  const { name, email, phone, password } = req.body;
 
-  // User login
-  login: async (req, res) => {
-    try {
-      // TODO: Implement user login logic
-      // - Validate credentials
-      // - Check user exists
-      // - Verify password
-      // - Generate JWT token
-      // - Send response
-      
-      res.status(200).json({
-        status: 'success',
-        message: 'Login successful',
-        data: {
-          user: {
-            id: 'dummy-user-id',
-            name: 'Test User',
-            email: req.body.email,
-            role: 'volunteer'
-          },
-          token: 'dummy-jwt-token'
-        }
-      });
-    } catch (error) {
-      res.status(500).json({
-        status: 'error',
-        message: error.message
-      });
-    }
-  },
+  const existingUser = await User.findOne({ email });
+  if (existingUser) return next(new AppError('Email already registered', 400));
 
-  // Get current user
-  getMe: async (req, res) => {
-    try {
-      // TODO: Get user from JWT token
-      res.status(200).json({
-        status: 'success',
-        data: {
-          user: {
-            id: 'dummy-user-id',
-            name: 'Test User',
-            email: 'test@example.com',
-            role: 'volunteer'
-          }
-        }
-      });
-    } catch (error) {
-      res.status(500).json({
-        status: 'error',
-        message: error.message
-      });
-    }
-  },
+  // 🚫 Do NOT accept role from client, always default to help_seeker
+  const user = await User.create({
+    name,
+    email,
+    phone,
+    password,
+    role: 'help_seeker' // enforce schema default explicitly
+  });
 
-  // Update password
-  updatePassword: async (req, res) => {
-    try {
-      // TODO: Implement password update logic
-      res.status(200).json({
-        status: 'success',
-        message: 'Password updated successfully'
-      });
-    } catch (error) {
-      res.status(500).json({
-        status: 'error',
-        message: error.message
-      });
+  const token = generateToken(user._id);
+
+  res.status(201).json({
+    status: 'success',
+    message: 'User registered successfully',
+    data: {
+      user: {
+        id: user._id,
+        name: user.name,
+        email: user.email,
+        phone: user.phone || null,
+        role: user.role
+      },
+      token
     }
+  });
+});
+
+// User Login
+exports.login = catchAsync(async (req, res, next) => {
+  const { email, password } = req.body;
+
+  const user = await User.findOne({ email }).select('+password');
+  if (!user) return next(new AppError('Invalid email or password', 401));
+
+  const isMatch = await bcrypt.compare(password, user.password);
+  if (!isMatch) return next(new AppError('Invalid email or password', 401));
+
+  const token = generateToken(user._id);
+
+  res.status(200).json({
+    status: 'success',
+    message: 'Login successful',
+    data: {
+      user: {
+        id: user._id,
+        name: user.name,
+        email: user.email,
+        phone: user.phone || null,
+        role: user.role
+      },
+      token
+    }
+  });
+});
+
+// Get current user (profile)
+exports.getMe = catchAsync(async (req, res) => {
+  const user = await User.findById(req.user.id);
+  res.status(200).json({ status: 'success', data: { user } });
+});
+
+// Update password
+exports.updatePassword = catchAsync(async (req, res, next) => {
+  const user = await User.findById(req.user.id).select('+password');
+  const { currentPassword, newPassword } = req.body;
+
+  if (!(await bcrypt.compare(currentPassword, user.password))) {
+    return next(new AppError('Your current password is wrong.', 401));
   }
-};
 
-module.exports = authController;
+  user.password = newPassword;
+  await user.save();
+
+  const token = generateToken(user._id);
+  res.status(200).json({ status: 'success', message: 'Password updated successfully', token });
+});

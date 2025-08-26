@@ -30,7 +30,7 @@ const userSchema = new mongoose.Schema({
   role: {
     type: String,
     enum: ['volunteer', 'help_seeker', 'partner', 'admin'],
-    default: 'volunteer'
+    default: 'help_seeker'
   },
   location: {
     city: String,

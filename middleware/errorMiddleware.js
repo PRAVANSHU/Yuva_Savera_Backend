@@ -80,7 +80,7 @@ const errorHandler = (err, req, res, next) => {
   if (process.env.NODE_ENV === 'development') {
     sendErrorDev(err, res);
   } else {
-    let error = { ...err };
+    let error = Object.create(err);
     error.message = err.message;
 
     // Handle specific error types

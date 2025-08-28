@@ -6,6 +6,8 @@ require("dotenv").config();
 
 // Import routes
 const authRoutes = require("./routes/authRoutes");
+const requestRoutes = require("./routes/requestRoutes");
+const adminRoutes = require('./routes/adminRoutes');
 
 // Import middleware
 const { errorHandler } = require("./middleware/errorMiddleware");
@@ -35,6 +37,8 @@ app.use("/api/", limiter);
 
 // Routes
 app.use("/api/auth", authRoutes);
+app.use("/api/requests", requestRoutes);
+app.use('/api/admin', adminRoutes);
 
 // Health check endpoint
 app.get("/api/health", (req, res) => {

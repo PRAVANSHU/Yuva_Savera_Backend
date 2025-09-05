@@ -1,7 +1,12 @@
 const mongoose = require('mongoose');
 
-// TODO: Define HelpRequest schema for managing help requests
+// HelpRequest schema
 const helpRequestSchema = new mongoose.Schema({
+  requestId: {
+    type: String,
+    unique: true,
+    default: () => `REQ-${Date.now()}-${Math.floor(Math.random() * 1000)}`,
+  },
   title: {
     type: String,
     required: [true, 'Title is required'],
@@ -20,17 +25,18 @@ const helpRequestSchema = new mongoose.Schema({
   },
   location: {
     address: String,
-    city: {
-      type: String,
-      required: true
-    },
-    state: {
-      type: String,
-      required: true
-    },
+    city: String,  
+    state: String,  
     coordinates: {
-      type: [Number], // [longitude, latitude]
-      index: '2dsphere'
+      type: {
+        type: String,
+        enum: ['Point'],
+        default: 'Point'
+      },
+      coordinates: {
+        type: [Number], // [longitude, latitude]
+        default: undefined // optional, so city names work
+      }
     }
   },
   urgencyLevel: {
@@ -73,8 +79,12 @@ const helpRequestSchema = new mongoose.Schema({
   },
   status: {
     type: String,
-    enum: ['Open', 'In Progress', 'Resolved', 'Closed', 'Cancelled'],
+    enum: ['Open', 'In Progress', 'Resolved', 'Closed', 'Cancelled', 'Approved', 'Rejected'],
     default: 'Open'
+  },
+  isPublic: {
+    type: Boolean,
+    default: false
   },
   assignedVolunteer: {
     type: mongoose.Schema.Types.ObjectId,
@@ -118,7 +128,7 @@ const helpRequestSchema = new mongoose.Schema({
   toObject: { virtuals: true }
 });
 
-// Indexes for better performance
+// Indexes for performance
 helpRequestSchema.index({ category: 1 });
 helpRequestSchema.index({ status: 1 });
 helpRequestSchema.index({ urgencyLevel: 1 });
@@ -126,12 +136,12 @@ helpRequestSchema.index({ 'location.coordinates': '2dsphere' });
 helpRequestSchema.index({ createdAt: -1 });
 helpRequestSchema.index({ assignedVolunteer: 1 });
 
-// Virtual for time since creation
+// Virtual for "time ago"
 helpRequestSchema.virtual('timeAgo').get(function() {
   const now = new Date();
   const diff = now - this.createdAt;
   const days = Math.floor(diff / (1000 * 60 * 60 * 24));
-  
+
   if (days === 0) return 'Today';
   if (days === 1) return 'Yesterday';
   return `${days} days ago`;
@@ -145,7 +155,7 @@ helpRequestSchema.methods.assignVolunteer = function(volunteerId) {
   return this.save();
 };
 
-// Method to mark as resolved
+// Method to mark resolved
 helpRequestSchema.methods.markResolved = function(feedback) {
   this.status = 'Resolved';
   this.resolvedAt = new Date();
@@ -158,7 +168,7 @@ helpRequestSchema.methods.markResolved = function(feedback) {
   return this.save();
 };
 
-// Static method to find nearby requests
+// Static method for nearby requests
 helpRequestSchema.statics.findNearby = function(coordinates, maxDistance = 50000) {
   return this.find({
     'location.coordinates': {

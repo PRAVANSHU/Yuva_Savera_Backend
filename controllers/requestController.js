@@ -1,139 +1,175 @@
-// TODO: Implement help request controllers
-// This file will contain help request creation, management, and matching logic
+const axios = require("axios");
+const HelpRequest = require("../models/HelpRequest");
+const cloudinary = require("../config/cloudinary");
+const fs = require("fs");
+
+// Helper: Upload Video (optional, if needed separately)
+const uploadVideoToCloudinary = async (filePath) => {
+  return await cloudinary.uploader.upload(filePath, {
+    resource_type: "video",
+    folder: "help_requests/videos",
+  });
+};
+
+// Helper: Get coordinates from location name
+const getCoordinates = async (location) => {
+  try {
+    const response = await axios.get("https://nominatim.openstreetmap.org/search", {
+      params: { q: location, format: "json", limit: 1 },
+    });
+
+    if (!response.data || response.data.length === 0) return null;
+
+    const { lat, lon } = response.data[0];
+    return [parseFloat(lon), parseFloat(lat)]; // MongoDB expects [longitude, latitude]
+  } catch (err) {
+    console.error("❌ Geocoding error:", err);
+    return null;
+  }
+};
 
 const requestController = {
-  // Create new help request
   createRequest: async (req, res) => {
     try {
-      // TODO: Implement help request creation logic
-      // - Validate request data
-      // - Handle file uploads (video)
-      // - Create request in database
-      // - Notify relevant volunteers
-      // - Return created request
-      
-      res.status(201).json({
-        status: 'success',
-        message: 'Help request created successfully',
-        data: {
-          request: {
-            id: 'dummy-request-id',
-            title: req.body.title,
-            description: req.body.description,
-            category: req.body.category,
-            location: req.body.location,
-            urgencyLevel: req.body.urgency,
-            status: 'Open',
-            submittedBy: req.body.contactName,
-            anonymous: req.body.anonymous || false,
-            createdAt: new Date().toISOString()
-          }
+      const { title, description, category, location, urgency, contactName, contactPhone, contactEmail, anonymous, additionalInfo } = req.body;
+
+      if (!title || !description || !category || !location || !urgency) {
+        return res.status(400).json({ status: "fail", message: "Missing required fields" });
+      }
+
+      // Handle video upload if exists
+      let videoData = null;
+      if (req.file) {
+        const { path: url, filename: publicId } = req.file;
+        try {
+          const thumbnail = cloudinary.url(publicId, {
+            resource_type: "video",
+            format: "jpg",
+            transformation: [{ width: 300, height: 200, crop: "fill" }],
+          });
+          videoData = { url, publicId, thumbnail };
+        } catch (err) {
+          console.error("❌ Error generating thumbnail:", err);
         }
+      }
+
+      // Split city, state if provided
+      let city = "", state = "";
+      if (location.includes(",")) [city, state] = location.split(",").map(s => s.trim());
+
+      // Get coordinates
+      const coords = await getCoordinates(location);
+
+      const newRequest = await HelpRequest.create({
+        title,
+        description,
+        category,
+        location: { 
+          address: location, 
+          city, 
+          state, 
+          coordinates: coords ? { type: "Point", coordinates: coords } : undefined 
+        },
+        urgencyLevel: urgency,
+        submittedBy: { name: contactName, phone: contactPhone, email: contactEmail },
+        anonymous: anonymous || false,
+        media: { video: videoData },
+        tags: additionalInfo ? [additionalInfo] : [],
       });
+
+      res.status(201).json({ status: "success", message: "Help request created successfully", data: { request: newRequest } });
+
     } catch (error) {
-      res.status(500).json({
-        status: 'error',
-        message: error.message
-      });
+      console.error("❌ Backend error:", error);
+      res.status(500).json({ status: "error", message: error.message });
     }
   },
 
-  // Get all help requests with filters
+  // Get all help requests
   getAllRequests: async (req, res) => {
     try {
-      // TODO: Implement request filtering and pagination
-      // - Apply category, location, urgency filters
-      // - Implement pagination
-      // - Sort by relevance/date
-      
-      const mockRequests = [
-        {
-          id: '1',
-          title: 'Need help with job interview preparation',
-          description: 'Recently graduated student needs guidance for upcoming job interviews in IT sector.',
-          category: 'Employment',
-          location: 'Mumbai, Maharashtra',
-          urgencyLevel: 'Medium',
-          status: 'Open',
-          submittedBy: 'Rahul Kumar',
-          createdAt: '2025-01-09',
-          anonymous: false
-        }
-      ];
+      const { category, urgency, page = 1, limit = 10 } = req.query;
+      const filter = {};
+
+      if (category) filter.category = category;
+      if (urgency) filter.urgencyLevel = urgency;
+
+      const requests = await HelpRequest.find(filter)
+        .sort({ createdAt: -1 })
+        .skip((page - 1) * limit)
+        .limit(Number(limit));
+
+      const total = await HelpRequest.countDocuments(filter);
 
       res.status(200).json({
-        status: 'success',
+        status: "success",
         data: {
-          requests: mockRequests,
+          requests,
           pagination: {
-            currentPage: 1,
-            totalPages: 1,
-            totalRequests: mockRequests.length
-          }
-        }
+            currentPage: Number(page),
+            totalPages: Math.ceil(total / limit),
+            totalRequests: total,
+          },
+        },
       });
     } catch (error) {
       res.status(500).json({
-        status: 'error',
-        message: error.message
+        status: "error",
+        message: error.message,
       });
     }
   },
 
-  // Get single help request by ID
+  // Get single request by ID
   getRequestById: async (req, res) => {
     try {
-      // TODO: Fetch request by ID from database
+      const request = await HelpRequest.findById(req.params.id);
+      if (!request) {
+        return res.status(404).json({
+          status: "fail",
+          message: "Request not found",
+        });
+      }
+
       res.status(200).json({
-        status: 'success',
-        data: {
-          request: {
-            id: req.params.id,
-            title: 'Need help with job interview preparation',
-            description: 'Recently graduated student needs guidance for upcoming job interviews in IT sector.',
-            category: 'Employment',
-            location: 'Mumbai, Maharashtra',
-            urgencyLevel: 'Medium',
-            status: 'Open',
-            submittedBy: 'Rahul Kumar',
-            createdAt: '2025-01-09',
-            anonymous: false
-          }
-        }
+        status: "success",
+        data: { request },
       });
     } catch (error) {
       res.status(500).json({
-        status: 'error',
-        message: error.message
+        status: "error",
+        message: error.message,
       });
     }
   },
 
-  // Assign volunteer to request
+  // Assign volunteer
   assignVolunteer: async (req, res) => {
     try {
-      // TODO: Implement volunteer assignment logic
-      // - Validate volunteer and request
-      // - Update request status
-      // - Notify both parties
-      // - Create connection record
-      
+      const { volunteerId } = req.body;
+      const request = await HelpRequest.findById(req.params.id);
+
+      if (!request) {
+        return res.status(404).json({
+          status: "fail",
+          message: "Request not found",
+        });
+      }
+
+      // If you don't have assignVolunteer method in schema:
+      request.assignedTo = volunteerId;
+      request.status = "In Progress";
+      await request.save();
+
       res.status(200).json({
-        status: 'success',
-        message: 'Volunteer assigned successfully',
-        data: {
-          assignment: {
-            requestId: req.params.id,
-            volunteerId: req.body.volunteerId,
-            assignedAt: new Date().toISOString(),
-            status: 'assigned'
-          }
-        }
+        status: "success",
+        message: "Volunteer assigned successfully",
+        data: { request },
       });
     } catch (error) {
       res.status(500).json({
-        status: 'error',
-        message: error.message
+        status: "error",
+        message: error.message,
       });
     }
   },
@@ -141,54 +177,75 @@ const requestController = {
   // Update request status
   updateRequestStatus: async (req, res) => {
     try {
-      // TODO: Update request status in database
+      const { status } = req.body;
+      const allowedStatuses = ["Open", "In Progress", "Resolved", "Closed"];
+
+      if (!allowedStatuses.includes(status)) {
+        return res.status(400).json({
+          status: "fail",
+          message: "Invalid status value",
+        });
+      }
+
+      const request = await HelpRequest.findByIdAndUpdate(
+        req.params.id,
+        { status },
+        { new: true }
+      );
+
+      if (!request) {
+        return res.status(404).json({
+          status: "fail",
+          message: "Request not found",
+        });
+      }
+
       res.status(200).json({
-        status: 'success',
-        message: 'Request status updated successfully',
-        data: {
-          request: {
-            id: req.params.id,
-            status: req.body.status,
-            updatedAt: new Date().toISOString()
-          }
-        }
+        status: "success",
+        message: "Request status updated successfully",
+        data: { request },
       });
     } catch (error) {
       res.status(500).json({
-        status: 'error',
-        message: error.message
+        status: "error",
+        message: error.message,
       });
     }
   },
 
-  // Get request statistics
+  // Get statistics
   getRequestStats: async (req, res) => {
     try {
-      // TODO: Calculate request statistics
+      const totalRequests = await HelpRequest.countDocuments();
+      const activeRequests = await HelpRequest.countDocuments({
+        status: { $in: ["Open", "In Progress"] },
+      });
+      const resolvedRequests = await HelpRequest.countDocuments({
+        status: "Resolved",
+      });
+
+      const categoryBreakdown = await HelpRequest.aggregate([
+        { $group: { _id: "$category", count: { $sum: 1 } } },
+      ]);
+
       res.status(200).json({
-        status: 'success',
+        status: "success",
         data: {
           stats: {
-            totalRequests: 8934,
-            activeRequests: 234,
-            resolvedRequests: 8700,
-            categoryBreakdown: {
-              Education: 3245,
-              Healthcare: 2156,
-              Employment: 1876,
-              Counseling: 1098,
-              Emergency: 559
-            }
-          }
-        }
+            totalRequests,
+            activeRequests,
+            resolvedRequests,
+            categoryBreakdown,
+          },
+        },
       });
     } catch (error) {
       res.status(500).json({
-        status: 'error',
-        message: error.message
+        status: "error",
+        message: error.message,
       });
     }
-  }
+  },
 };
 
 module.exports = requestController;

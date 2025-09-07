@@ -58,7 +58,7 @@ app.use("/api/public", publicRoutes);
 app.use("/api/stories", storyRoutes);
 app.use("/api/contact", contactRoutes);
 app.use("/api/reports", reportRoutes);
-app.use("/api/volunteers", volunteerRoutes);
+app.use('/api/volunteer', volunteerRoutes);
 
 // Health check
 app.get("/api/health", (req, res) => {

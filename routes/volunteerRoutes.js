@@ -8,16 +8,13 @@ const router = express.Router();
 // ---------------- Public routes ----------------
 router.get('/leaderboard', volunteerController.getLeaderboard);
 
-// ✅ Volunteer registration should be PUBLIC
-router.post(
-  '/register',
-  upload.single('idProof'),
-  volunteerController.registerVolunteer
-);
+// Volunteer registration with file upload (idProof)
+router.post('/register', uploadFile.single('idProof'), volunteerController.registerVolunteer);
 
 // ---------------- Protected routes ----------------
 router.use(protect);
 
+// Volunteer profile & dashboard
 router.get('/profile/:id', volunteerController.getVolunteerProfile);
 router.patch('/profile/:id', volunteerController.updateVolunteerProfile);
 router.get('/dashboard', volunteerController.getVolunteerDashboard);

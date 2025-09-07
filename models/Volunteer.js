@@ -1,6 +1,5 @@
 const mongoose = require('mongoose');
 
-// TODO: Define Volunteer schema extending User data
 const volunteerSchema = new mongoose.Schema({
   userId: {
     type: mongoose.Schema.Types.ObjectId,
@@ -8,86 +7,49 @@ const volunteerSchema = new mongoose.Schema({
     required: true,
     unique: true
   },
-  skills: [{
-    type: String,
-    required: true
-  }],
-  causesOfInterest: [{
-    type: String,
-    required: true
-  }],
+  name: { type: String },  // optional, can be populated from User
+  email: { type: String },
+  phone: { type: String },
+  location: { type: String, required: true },
+  skills: {
+    type: [String],
+    validate: [arr => arr.length > 0, 'At least one skill is required']
+  },
+  causesOfInterest: {
+    type: [String],
+    validate: [arr => arr.length > 0, 'At least one cause of interest is required']
+  },
   availability: {
     type: String,
     enum: ['weekends', 'evenings', 'flexible', 'full-time'],
     required: true
   },
-  experience: {
-    type: String,
-    maxLength: [1000, 'Experience description cannot exceed 1000 characters']
-  },
-  motivation: {
-    type: String,
-    required: [true, 'Motivation is required'],
-    maxLength: [1000, 'Motivation cannot exceed 1000 characters']
-  },
+  experience: { type: String, maxLength: [1000, 'Experience description cannot exceed 1000 characters'] },
+  motivation: { type: String, required: true, maxLength: [1000, 'Motivation cannot exceed 1000 characters'] },
   idProof: {
     url: String,
     publicId: String,
-    type: String // 'aadhaar', 'driving_license', 'passport'
+    type: { type: String, enum: ['aadhaar', 'driving_license', 'passport'] }
   },
-  points: {
-    type: Number,
-    default: 0,
-    min: 0
-  },
+  points: { type: Number, default: 0, min: 0 },
   badges: [{
     name: String,
-    earnedAt: {
-      type: Date,
-      default: Date.now
-    },
+    earnedAt: { type: Date, default: Date.now },
     description: String
   }],
   rating: {
-    average: {
-      type: Number,
-      default: 0,
-      min: 0,
-      max: 5
-    },
-    count: {
-      type: Number,
-      default: 0
-    }
+    average: { type: Number, default: 0, min: 0, max: 5 },
+    count: { type: Number, default: 0 }
   },
-  contributionHistory: [{
-    type: mongoose.Schema.Types.ObjectId,
-    ref: 'Contribution'
-  }],
-  status: {
-    type: String,
-    enum: ['pending_review', 'approved', 'suspended', 'inactive'],
-    default: 'pending_review'
-  },
+  contributionHistory: [{ type: mongoose.Schema.Types.ObjectId, ref: 'Contribution' }],
+  status: { type: String, enum: ['pending_review', 'approved', 'suspended', 'inactive'], default: 'pending_review' },
   preferences: {
     notifications: {
-      email: {
-        type: Boolean,
-        default: true
-      },
-      sms: {
-        type: Boolean,
-        default: false
-      },
-      push: {
-        type: Boolean,
-        default: true
-      }
+      email: { type: Boolean, default: true },
+      sms: { type: Boolean, default: false },
+      push: { type: Boolean, default: true }
     },
-    maxDistance: {
-      type: Number,
-      default: 50 // kilometers
-    }
+    maxDistance: { type: Number, default: 50 }
   }
 }, {
   timestamps: true,
@@ -96,7 +58,6 @@ const volunteerSchema = new mongoose.Schema({
 });
 
 // Indexes
-volunteerSchema.index({ userId: 1 });
 volunteerSchema.index({ skills: 1 });
 volunteerSchema.index({ causesOfInterest: 1 });
 volunteerSchema.index({ status: 1 });
@@ -110,20 +71,20 @@ volunteerSchema.virtual('user', {
   justOne: true
 });
 
-// Method to add points
+// Auto-populate user info
+volunteerSchema.pre(/^find/, function(next) {
+  this.populate('user', 'name email phone');
+  next();
+});
+
+// Methods
 volunteerSchema.methods.addPoints = function(points, reason) {
   this.points += points;
-  // TODO: Add to contribution history
   return this.save();
 };
 
-// Method to add badge
 volunteerSchema.methods.addBadge = function(badgeName, description) {
-  this.badges.push({
-    name: badgeName,
-    description: description,
-    earnedAt: new Date()
-  });
+  this.badges.push({ name: badgeName, description, earnedAt: new Date() });
   return this.save();
 };
 

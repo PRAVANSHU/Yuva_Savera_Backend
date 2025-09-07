@@ -3,7 +3,7 @@ const HelpRequest = require("../models/HelpRequest");
 const cloudinary = require("../config/cloudinary");
 const fs = require("fs");
 
-// Helper: Upload Video (optional, if needed separately)
+// Helper: Upload Video (optional)
 const uploadVideoToCloudinary = async (filePath) => {
   return await cloudinary.uploader.upload(filePath, {
     resource_type: "video",
@@ -14,14 +14,15 @@ const uploadVideoToCloudinary = async (filePath) => {
 // Helper: Get coordinates from location name
 const getCoordinates = async (location) => {
   try {
-    const response = await axios.get("https://nominatim.openstreetmap.org/search", {
-      params: { q: location, format: "json", limit: 1 },
-    });
+    const response = await axios.get(
+      "https://nominatim.openstreetmap.org/search",
+      { params: { q: location, format: "json", limit: 1 } }
+    );
 
     if (!response.data || response.data.length === 0) return null;
 
     const { lat, lon } = response.data[0];
-    return [parseFloat(lon), parseFloat(lat)]; // MongoDB expects [longitude, latitude]
+    return [parseFloat(lon), parseFloat(lat)]; // Mongo expects [lng, lat]
   } catch (err) {
     console.error("❌ Geocoding error:", err);
     return null;
@@ -29,15 +30,29 @@ const getCoordinates = async (location) => {
 };
 
 const requestController = {
+  // Create new help request
   createRequest: async (req, res) => {
     try {
-      const { title, description, category, location, urgency, contactName, contactPhone, contactEmail, anonymous, additionalInfo } = req.body;
+      const {
+        title,
+        description,
+        category,
+        location,
+        urgency,
+        contactName,
+        contactPhone,
+        contactEmail,
+        anonymous,
+        additionalInfo,
+      } = req.body;
 
       if (!title || !description || !category || !location || !urgency) {
-        return res.status(400).json({ status: "fail", message: "Missing required fields" });
+        return res
+          .status(400)
+          .json({ status: "fail", message: "Missing required fields" });
       }
 
-      // Handle video upload if exists
+      // Handle video upload
       let videoData = null;
       if (req.file) {
         const { path: url, filename: publicId } = req.file;
@@ -53,44 +68,46 @@ const requestController = {
         }
       }
 
-      // Split city, state if provided
-      let city = "", state = "";
-      if (location.includes(",")) [city, state] = location.split(",").map(s => s.trim());
+      let city = "",
+        state = "";
+      if (location.includes(",")) [city, state] = location.split(",").map((s) => s.trim());
 
-      // Get coordinates
       const coords = await getCoordinates(location);
 
       const newRequest = await HelpRequest.create({
         title,
         description,
         category,
-        location: { 
-          address: location, 
-          city, 
-          state, 
-          coordinates: coords ? { type: "Point", coordinates: coords } : undefined 
+        location: {
+          address: location,
+          city,
+          state,
+          coordinates: coords ? { type: "Point", coordinates: coords } : undefined,
         },
         urgencyLevel: urgency,
         submittedBy: { name: contactName, phone: contactPhone, email: contactEmail },
         anonymous: anonymous || false,
+        isPublic: true,
         media: { video: videoData },
         tags: additionalInfo ? [additionalInfo] : [],
       });
 
-      res.status(201).json({ status: "success", message: "Help request created successfully", data: { request: newRequest } });
-
+      res.status(201).json({
+        status: "success",
+        message: "Help request created successfully",
+        data: { request: newRequest },
+      });
     } catch (error) {
       console.error("❌ Backend error:", error);
       res.status(500).json({ status: "error", message: error.message });
     }
   },
 
-  // Get all help requests
+  // Get all user requests
   getAllRequests: async (req, res) => {
     try {
       const { category, urgency, page = 1, limit = 10 } = req.query;
-      const filter = {};
-
+      const filter = { adminStatus: "approved", isPublic: true };
       if (category) filter.category = category;
       if (urgency) filter.urgencyLevel = urgency;
 
@@ -103,20 +120,15 @@ const requestController = {
 
       res.status(200).json({
         status: "success",
-        data: {
           requests,
           pagination: {
             currentPage: Number(page),
             totalPages: Math.ceil(total / limit),
             totalRequests: total,
           },
-        },
       });
     } catch (error) {
-      res.status(500).json({
-        status: "error",
-        message: error.message,
-      });
+      res.status(500).json({ status: "error", message: error.message });
     }
   },
 
@@ -124,22 +136,11 @@ const requestController = {
   getRequestById: async (req, res) => {
     try {
       const request = await HelpRequest.findById(req.params.id);
-      if (!request) {
-        return res.status(404).json({
-          status: "fail",
-          message: "Request not found",
-        });
-      }
+      if (!request) return res.status(404).json({ status: "fail", message: "Request not found" });
 
-      res.status(200).json({
-        status: "success",
-        data: { request },
-      });
+      res.status(200).json({ status: "success", data: { request } });
     } catch (error) {
-      res.status(500).json({
-        status: "error",
-        message: error.message,
-      });
+      res.status(500).json({ status: "error", message: error.message });
     }
   },
 
@@ -148,17 +149,10 @@ const requestController = {
     try {
       const { volunteerId } = req.body;
       const request = await HelpRequest.findById(req.params.id);
+      if (!request) return res.status(404).json({ status: "fail", message: "Request not found" });
 
-      if (!request) {
-        return res.status(404).json({
-          status: "fail",
-          message: "Request not found",
-        });
-      }
-
-      // If you don't have assignVolunteer method in schema:
-      request.assignedTo = volunteerId;
-      request.status = "In Progress";
+      request.assignedVolunteer = volunteerId;
+      request.status = "In Progress"; // user-side status
       await request.save();
 
       res.status(200).json({
@@ -167,38 +161,20 @@ const requestController = {
         data: { request },
       });
     } catch (error) {
-      res.status(500).json({
-        status: "error",
-        message: error.message,
-      });
+      res.status(500).json({ status: "error", message: error.message });
     }
   },
 
-  // Update request status
+  // Update user-side status (CaseTracking)
   updateRequestStatus: async (req, res) => {
     try {
       const { status } = req.body;
       const allowedStatuses = ["Open", "In Progress", "Resolved", "Closed"];
+      if (!allowedStatuses.includes(status))
+        return res.status(400).json({ status: "fail", message: "Invalid status value" });
 
-      if (!allowedStatuses.includes(status)) {
-        return res.status(400).json({
-          status: "fail",
-          message: "Invalid status value",
-        });
-      }
-
-      const request = await HelpRequest.findByIdAndUpdate(
-        req.params.id,
-        { status },
-        { new: true }
-      );
-
-      if (!request) {
-        return res.status(404).json({
-          status: "fail",
-          message: "Request not found",
-        });
-      }
+      const request = await HelpRequest.findByIdAndUpdate(req.params.id, { status }, { new: true });
+      if (!request) return res.status(404).json({ status: "fail", message: "Request not found" });
 
       res.status(200).json({
         status: "success",
@@ -206,44 +182,48 @@ const requestController = {
         data: { request },
       });
     } catch (error) {
-      res.status(500).json({
-        status: "error",
-        message: error.message,
-      });
+      res.status(500).json({ status: "error", message: error.message });
     }
   },
 
-  // Get statistics
+  // Admin approve/reject
+  adminApproveReject: async (req, res) => {
+    try {
+      const { action } = req.body;
+      const allowedActions = ["approve", "reject"];
+      if (!allowedActions.includes(action))
+        return res.status(400).json({ status: "fail", message: "Invalid action" });
+
+      const adminStatus = action === "approve" ? "approved" : "rejected";
+
+      const request = await HelpRequest.findByIdAndUpdate(
+        req.params.id,
+        { adminStatus },
+        { new: true }
+      );
+      if (!request) return res.status(404).json({ status: "fail", message: "Request not found" });
+
+      res.status(200).json({ status: "success", message: `Request ${adminStatus}`, data: { request } });
+    } catch (error) {
+      res.status(500).json({ status: "error", message: error.message });
+    }
+  },
+
+  // Get request statistics
   getRequestStats: async (req, res) => {
     try {
       const totalRequests = await HelpRequest.countDocuments();
-      const activeRequests = await HelpRequest.countDocuments({
-        status: { $in: ["Open", "In Progress"] },
-      });
-      const resolvedRequests = await HelpRequest.countDocuments({
-        status: "Resolved",
-      });
+      const activeRequests = await HelpRequest.countDocuments({ status: { $in: ["Open", "In Progress"] } });
+      const resolvedRequests = await HelpRequest.countDocuments({ status: "Resolved" });
 
-      const categoryBreakdown = await HelpRequest.aggregate([
-        { $group: { _id: "$category", count: { $sum: 1 } } },
-      ]);
+      const categoryBreakdown = await HelpRequest.aggregate([{ $group: { _id: "$category", count: { $sum: 1 } } }]);
 
       res.status(200).json({
         status: "success",
-        data: {
-          stats: {
-            totalRequests,
-            activeRequests,
-            resolvedRequests,
-            categoryBreakdown,
-          },
-        },
+        data: { stats: { totalRequests, activeRequests, resolvedRequests, categoryBreakdown } },
       });
     } catch (error) {
-      res.status(500).json({
-        status: "error",
-        message: error.message,
-      });
+      res.status(500).json({ status: "error", message: error.message });
     }
   },
 };

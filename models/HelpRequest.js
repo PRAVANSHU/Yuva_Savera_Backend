@@ -78,9 +78,14 @@ const helpRequestSchema = new mongoose.Schema({
     }]
   },
   status: {
-    type: String,
-    enum: ['Open', 'In Progress', 'Resolved', 'Closed', 'Cancelled', 'Approved', 'Rejected'],
-    default: 'Open'
+  type: String,
+  enum: ['Open', 'In Progress', 'Resolved', 'Closed', 'Cancelled'],
+  default: 'Open'   // for user updates (CaseTracking)
+  },
+  adminStatus: {
+  type: String,
+  enum: ['pending', 'approved', 'rejected'],
+  default: 'pending' // for admin approval
   },
   isPublic: {
     type: Boolean,

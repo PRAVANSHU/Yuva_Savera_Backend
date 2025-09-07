@@ -47,6 +47,23 @@ exports.login = catchAsync(async (req, res, next) => {
   const isMatch = await bcrypt.compare(password, user.password);
   if (!isMatch) return next(new AppError('Invalid email or password', 401));
 
+  // ---------- ADD THIS BLOCK ----------
+  if (user.role === 'volunteer') {
+    const Volunteer = require('../models/Volunteer');
+    const volunteer = await Volunteer.findOne({ userId: user._id });
+    if (!volunteer)
+      return next(new AppError('Volunteer profile missing', 400));
+
+    if (volunteer.status !== 'approved') {
+      return next(
+        new AppError(
+          'Your account is not approved yet. Please contact admin.',
+          403
+        )
+      );
+    }
+  }
+
   const token = generateToken(user._id);
 
   res.status(200).json({

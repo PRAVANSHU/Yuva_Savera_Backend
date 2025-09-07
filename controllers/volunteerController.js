@@ -1,99 +1,116 @@
-// TODO: Implement volunteer-related controllers
-// This file will contain volunteer profile management, matching, and contribution tracking
+const Volunteer = require('../models/Volunteer');
+const User = require('../models/User');
+const bcrypt = require('bcryptjs');
 
 const volunteerController = {
-  // Register as volunteer
+  // ========================
+  // Volunteer self-service routes
+  // ========================
+
+  // Register as volunteer (self-service)
   registerVolunteer: async (req, res) => {
     try {
-      // TODO: Implement volunteer registration logic
-      // - Validate volunteer data
-      // - Create volunteer profile
-      // - Handle file uploads (ID proof)
-      // - Send welcome email
-      // - Return volunteer profile
-      
+      const {
+        name,
+        email,
+        phone,
+        location,
+        skills,
+        causes,
+        availability,
+        experience,
+        motivation,
+        password
+      } = req.body;
+
+      if (!name || !email || !phone || !skills?.length || !causes?.length || !availability || !motivation || !password || !location) {
+        return res.status(400).json({ status: 'fail', message: 'All required fields must be provided' });
+      }
+
+      const hashedPassword = await bcrypt.hash(password, 12);
+
+      const user = await User.create({
+        name,
+        email,
+        phone,
+        role: 'volunteer',
+        password: hashedPassword
+      });
+
+      const volunteer = await Volunteer.create({
+        userId: user._id,
+        skills,
+        causesOfInterest: causes,
+        location,
+        availability,
+        experience,
+        motivation,
+        status: 'pending_review'
+      });
+
       res.status(201).json({
         status: 'success',
         message: 'Volunteer registered successfully',
-        data: {
-          volunteer: {
-            id: 'dummy-volunteer-id',
-            userId: req.body.userId || 'dummy-user-id',
-            name: req.body.name,
-            skills: req.body.skills || [],
-            causesOfInterest: req.body.causes || [],
-            location: req.body.location,
-            points: 0,
-            badges: [],
-            status: 'pending_review'
-          }
-        }
+        data: { volunteer }
       });
     } catch (error) {
-      res.status(500).json({
-        status: 'error',
-        message: error.message
-      });
+      console.error(error);
+      res.status(500).json({ status: 'error', message: error.message });
     }
   },
 
   // Get volunteer profile
   getVolunteerProfile: async (req, res) => {
     try {
-      // TODO: Fetch volunteer profile from database
-      res.status(200).json({
-        status: 'success',
-        data: {
-          volunteer: {
-            id: req.params.id,
-            name: 'Arjun Patel',
-            email: 'arjun.patel@example.com',
-            phone: '+91-9876543210',
-            location: 'Mumbai, Maharashtra',
-            skills: ['Teaching', 'Counseling', 'Web Development'],
-            causesOfInterest: ['Education', 'Mental Health', 'Employment'],
-            points: 1250,
-            badges: ['First Help', 'Education Champion', 'Community Leader'],
-            contributionHistory: [],
-            joinedDate: '2024-12-01'
-          }
-        }
-      });
+      const volunteer = await Volunteer.findById(req.params.id)
+        .populate('user', 'name email phone')
+        .lean();
+
+      if (!volunteer) {
+        return res.status(404).json({ status: 'fail', message: 'Volunteer not found' });
+      }
+
+      res.status(200).json({ status: 'success', data: { volunteer } });
     } catch (error) {
-      res.status(500).json({
-        status: 'error',
-        message: error.message
-      });
+      res.status(500).json({ status: 'error', message: error.message });
     }
   },
 
-  // Update volunteer profile
+  // Update volunteer profile (self-service)
   updateVolunteerProfile: async (req, res) => {
     try {
-      // TODO: Update volunteer profile in database
-      res.status(200).json({
-        status: 'success',
-        message: 'Volunteer profile updated successfully',
-        data: {
-          volunteer: {
-            id: req.params.id,
-            ...req.body,
-            updatedAt: new Date().toISOString()
+      const allowedFields = ['skills', 'causes', 'causesOfInterest', 'availability', 'experience', 'motivation', 'location'];
+      const updates = {};
+
+      allowedFields.forEach(field => {
+        if (req.body[field] !== undefined) {
+          if (field === 'causes') {
+            updates['causesOfInterest'] = req.body[field]; // map causes → causesOfInterest
+          } else {
+            updates[field] = req.body[field];
           }
         }
       });
-    } catch (error) {
-      res.status(500).json({
-        status: 'error',
-        message: error.message
+
+      const volunteer = await Volunteer.findByIdAndUpdate(req.params.id, updates, { new: true });
+      if (!volunteer) {
+        return res.status(404).json({ status: 'fail', message: 'Volunteer not found' });
+      }
+
+      res.status(200).json({
+        status: 'success',
+        message: 'Volunteer profile updated successfully',
+        data: { volunteer }
       });
+    } catch (error) {
+      res.status(500).json({ status: 'error', message: error.message });
     }
   },
 
   // Get volunteer dashboard data
   getVolunteerDashboard: async (req, res) => {
     try {
-      // TODO: Fetch volunteer dashboard data
+      // TODO: Replace with real contribution data
       res.status(200).json({
         status: 'success',
         data: {
@@ -111,32 +128,112 @@ const volunteerController = {
         }
       });
     } catch (error) {
-      res.status(500).json({
-        status: 'error',
-        message: error.message
-      });
+      res.status(500).json({ status: 'error', message: error.message });
     }
   },
 
   // Get volunteer leaderboard
   getLeaderboard: async (req, res) => {
     try {
-      // TODO: Fetch volunteer leaderboard
+      const topVolunteers = await Volunteer.find()
+        .sort({ points: -1 })
+        .limit(10)
+        .populate('user', 'name')
+        .lean();
+
+      const leaderboard = topVolunteers.map((v, index) => ({
+        id: v._id,
+        name: v.user?.name || 'Unknown',
+        points: v.points,
+        rank: index + 1
+      }));
+
+      res.status(200).json({ status: 'success', data: { leaderboard } });
+    } catch (error) {
+      res.status(500).json({ status: 'error', message: error.message });
+    }
+  },
+
+  // ========================
+  // Core Admin routes
+  // ========================
+
+  // Get all volunteers
+  getAllVolunteers: async (req, res) => {
+    try {
+      const volunteers = await Volunteer.find()
+        .populate('user', 'name email phone')
+        .lean();
+
       res.status(200).json({
         status: 'success',
-        data: {
-          leaderboard: [
-            { id: '1', name: 'Priya Sharma', points: 2450, rank: 1 },
-            { id: '2', name: 'Rahul Kumar', points: 2100, rank: 2 },
-            { id: '3', name: 'Anita Singh', points: 1890, rank: 3 }
-          ]
-        }
+        results: volunteers.length,
+        data: { volunteers }
       });
     } catch (error) {
-      res.status(500).json({
-        status: 'error',
-        message: error.message
+      res.status(500).json({ status: 'error', message: error.message });
+    }
+  },
+
+// Add a new volunteer (admin)
+addNewVolunteer: async (req, res) => {
+  try {
+    const { name, email, phone, password, skills, causes, availability, motivation, location } = req.body;
+
+    // Only enforce basic fields for admin
+    if (!name || !email || !phone || !password) {
+      return res.status(400).json({ status: 'fail', message: 'Name, email, phone and password are required' });
+    }
+
+    const hashedPassword = await bcrypt.hash(password, 12);
+
+    const user = await User.create({
+      name,
+      email,
+      phone,
+      role: 'volunteer',
+      password: hashedPassword
+    });
+
+    const volunteer = await Volunteer.create({
+      userId: user._id,
+      skills: skills && skills.length ? skills : ['General'],
+      causesOfInterest: causes && causes.length ? causes : ['General'],
+      location: location || 'Not Provided',
+      availability: availability || 'flexible',
+      motivation: motivation || 'N/A',
+      status: 'approved'  // admin-created volunteers are automatically approved
+    });
+
+    res.status(201).json({
+      status: 'success',
+      message: 'Volunteer added successfully',
+      data: { volunteer }
+    });
+  } catch (error) {
+    res.status(500).json({ status: 'error', message: error.message });
+  }
+},
+
+  // Activate/Deactivate volunteer
+  toggleVolunteerStatus: async (req, res) => {
+    try {
+      const volunteer = await Volunteer.findById(req.params.id);
+      if (!volunteer) {
+        return res.status(404).json({ status: 'fail', message: 'Volunteer not found' });
+      }
+
+      // Better: toggle between approved <-> inactive, else allow admin to set explicitly
+      volunteer.status = volunteer.status === 'approved' ? 'inactive' : 'approved';
+      await volunteer.save();
+
+      res.status(200).json({
+        status: 'success',
+        message: `Volunteer is now ${volunteer.status}`,
+        data: { volunteer }
       });
+    } catch (error) {
+      res.status(500).json({ status: 'error', message: error.message });
     }
   }
 };

@@ -1,16 +1,19 @@
 const User = require('../models/User');
 const bcrypt = require('bcryptjs');
+const mongoose = require('mongoose');
 const generateToken = require('../utils/generateToken');
 const { AppError, catchAsync } = require('../middleware/errorMiddleware');
 
+// =====================
 // User Registration
+// =====================
 exports.register = catchAsync(async (req, res, next) => {
   const { name, email, phone, password } = req.body;
 
   const existingUser = await User.findOne({ email });
   if (existingUser) return next(new AppError('Email already registered', 400));
 
-  // 🚫 Do NOT accept role from client, always default to help_seeker
+  // Do NOT accept role from client, always default to help_seeker
   const user = await User.create({
     name,
     email,
@@ -37,22 +40,37 @@ exports.register = catchAsync(async (req, res, next) => {
   });
 });
 
+// =====================
 // User Login
+// =====================
 exports.login = catchAsync(async (req, res, next) => {
   const { email, password } = req.body;
+  console.log("Login attempt:", { email, password });
 
-  const user = await User.findOne({ email }).select('+password');
+// Trim and lowercase the email before searching in DB
+  const emailTrimmed = email.trim().toLowerCase();
+  const user = await User.findOne({ email: emailTrimmed }).select('+password');
+  
+  console.log("User found:", user);
   if (!user) return next(new AppError('Invalid email or password', 401));
 
   const isMatch = await bcrypt.compare(password, user.password);
+  console.log("Password match:", isMatch);
   if (!isMatch) return next(new AppError('Invalid email or password', 401));
 
-  // ---------- ADD THIS BLOCK ----------
+  // Block inactive users
+  if (!user.isActive) {
+    return next(new AppError('Your account is inactive. Contact admin.', 403));
+  }
+
+  // Volunteer-specific checks
   if (user.role === 'volunteer') {
     const Volunteer = require('../models/Volunteer');
+
+    // Ensure type match using ObjectId
     const volunteer = await Volunteer.findOne({ userId: user._id });
-    if (!volunteer)
-      return next(new AppError('Volunteer profile missing', 400));
+
+    if (!volunteer) return next(new AppError('Volunteer profile missing', 400));
 
     if (volunteer.status !== 'approved') {
       return next(
@@ -82,13 +100,17 @@ exports.login = catchAsync(async (req, res, next) => {
   });
 });
 
-// Get current user (profile)
+// =====================
+// Get Current User (Profile)
+// =====================
 exports.getMe = catchAsync(async (req, res) => {
   const user = await User.findById(req.user.id);
   res.status(200).json({ status: 'success', data: { user } });
 });
 
-// Update password
+// =====================
+// Update Password
+// =====================
 exports.updatePassword = catchAsync(async (req, res, next) => {
   const user = await User.findById(req.user.id).select('+password');
   const { currentPassword, newPassword } = req.body;
@@ -101,5 +123,9 @@ exports.updatePassword = catchAsync(async (req, res, next) => {
   await user.save();
 
   const token = generateToken(user._id);
-  res.status(200).json({ status: 'success', message: 'Password updated successfully', token });
+  res.status(200).json({
+    status: 'success',
+    message: 'Password updated successfully',
+    token
+  });
 });

@@ -28,8 +28,14 @@ router.get('/dashboard', volunteerController.getVolunteerDashboard);
 // router.post('/contributions/:id/feedback', volunteerController.submitFeedback);
 
 // ---------------- Admin only routes ----------------
-router.use(restrictTo('admin'));
-// router.get('/', volunteerController.getAllVolunteers);
+router.use(restrictTo('admin', 'core_admin'));
+router.get('/', volunteerController.getAllVolunteers);
+
+// Approve/Reject (status column)
+router.patch('/:id/review', volunteerController.updateVolunteerStatus);
+
+// Activate/Deactivate (action column)
+router.patch('/:id/toggle', volunteerController.toggleVolunteerStatus);
 // router.patch('/:id/approve', volunteerController.approveVolunteer);
 // router.patch('/:id/suspend', volunteerController.suspendVolunteer);
 // router.patch('/:id/points', volunteerController.updatePoints);

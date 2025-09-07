@@ -30,15 +30,13 @@ const volunteerController = {
         return res.status(400).json({ status: 'fail', message: 'All required fields must be provided' });
       }
 
-      const hashedPassword = await bcrypt.hash(password, 12);
-
       // Create user (no password required yet)
       const user = await User.create({
         name,
         email,
         phone,
         role: 'volunteer',
-        password: hashedPassword // password will be set after approval if needed
+        password 
       });
 
       // Handle optional file
@@ -199,14 +197,12 @@ const volunteerController = {
         return res.status(400).json({ status: 'fail', message: 'Name, email, phone and password are required' });
       }
 
-      const hashedPassword = await bcrypt.hash(password, 12);
-
       const user = await User.create({
         name,
         email,
         phone,
         role: 'volunteer',
-        password: hashedPassword
+        password
       });
 
       const volunteer = await Volunteer.create({
@@ -237,18 +233,47 @@ const volunteerController = {
         return res.status(404).json({ status: 'fail', message: 'Volunteer not found' });
       }
 
-      volunteer.status = volunteer.status === 'approved' ? 'inactive' : 'approved';
+      volunteer.isActive = !volunteer.isActive;
       await volunteer.save();
 
       res.status(200).json({
         status: 'success',
-        message: `Volunteer is now ${volunteer.status}`,
+        message: `Volunteer is now ${volunteer.status.isActive ? 'active' : 'inactive'}`,
         data: { volunteer }
       });
     } catch (error) {
       res.status(500).json({ status: 'error', message: error.message });
     }
+  },
+  
+  // Approve or reject volunteer
+updateVolunteerStatus: async (req, res) => {
+  try {
+    const { status } = req.body; // expected 'approved' or 'rejected'
+    if (!['approved', 'rejected'].includes(status)) {
+      return res.status(400).json({ status: 'fail', message: 'Invalid status value' });
+    }
+
+    const volunteer = await Volunteer.findByIdAndUpdate(
+      req.params.id,
+      { status },
+      { new: true, runValidators: true }
+    );
+
+    if (!volunteer) {
+      return res.status(404).json({ status: 'fail', message: 'Volunteer not found' });
+    }
+
+    res.status(200).json({
+      status: 'success',
+      message: `Volunteer status updated to ${status}`,
+      data: { volunteer }
+    });
+  } catch (error) {
+    res.status(500).json({ status: 'error', message: error.message });
   }
+ }
 };
+
 
 module.exports = volunteerController;

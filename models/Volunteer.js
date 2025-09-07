@@ -7,7 +7,7 @@ const volunteerSchema = new mongoose.Schema({
     required: true,
     unique: true
   },
-  name: { type: String },  // optional, can be populated from User
+  name: { type: String },
   email: { type: String },
   phone: { type: String },
   location: { type: String, required: true },
@@ -42,7 +42,20 @@ const volunteerSchema = new mongoose.Schema({
     count: { type: Number, default: 0 }
   },
   contributionHistory: [{ type: mongoose.Schema.Types.ObjectId, ref: 'Contribution' }],
-  status: { type: String, enum: ['pending_review', 'approved', 'suspended', 'inactive'], default: 'pending_review' },
+
+  // 🔹 Status for approval (Core Admin only)
+  status: { 
+    type: String, 
+    enum: ['pending_review', 'approved', 'rejected'], 
+    default: 'pending_review' 
+  },
+
+  // 🔹 Separate field for activation (Action column)
+  isActive: { 
+    type: Boolean, 
+    default: true 
+  },
+
   preferences: {
     notifications: {
       email: { type: Boolean, default: true },

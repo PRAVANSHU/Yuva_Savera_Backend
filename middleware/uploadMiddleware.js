@@ -5,8 +5,8 @@ const cloudinary = require("../config/cloudinary");
 const storage = new CloudinaryStorage({
   cloudinary,
   params: {
-    folder: "yuva_savera_videos", // Cloudinary folder name
-    resource_type: "video", // Important for videos
+    folder: "yuva_savera_videos",
+    resource_type: "video",
     allowed_formats: ["mp4", "avi", "mkv", "mov"],
     public_id: (req, file) => `${Date.now()}-${file.originalname.split('.')[0]}`,
   },
@@ -14,4 +14,16 @@ const storage = new CloudinaryStorage({
 
 const upload = multer({ storage });
 
-module.exports = upload;
+const fileStorage = new CloudinaryStorage({
+  cloudinary,
+  params: {
+    folder: 'yuva_savera_volunteers',
+    resource_type: 'auto',
+    allowed_formats: ['jpeg','jpg', 'png', 'pdf'],
+    // public_id: (req, file) => `${Date.now()}-${file.originalname.split('.')[0]}`,
+  },
+});
+
+const uploadFile = multer({storage: fileStorage });
+
+module.exports = {upload, uploadFile};

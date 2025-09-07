@@ -1,8 +1,10 @@
+require("dotenv").config();
 const express = require("express");
 const cors = require("cors");
 const helmet = require("helmet");
 const rateLimit = require("express-rate-limit");
-require("dotenv").config();
+const storyRoutes = require("./routes/storyRoutes");
+
 
 // Import routes
 const authRoutes = require("./routes/authRoutes");
@@ -47,6 +49,8 @@ app.use('/api/public', publicRoutes);
 app.use("/api/contact", contactRoutes);
 app.use("/api/reports", reportRoutes);
 app.use('/api/volunteer', volunteerRoutes);
+app.use("/api/stories", storyRoutes);
+
 
 // Health check endpoint
 app.get("/api/health", (req, res) => {

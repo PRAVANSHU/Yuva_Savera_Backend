@@ -2,7 +2,8 @@ const User = require("../models/User");
 const HelpRequest = require("../models/HelpRequest");
 const { catchAsync, AppError } = require("../middleware/errorMiddleware");
 
-// Get all users (Core Admin only)
+
+// ✅ Get all users (Core Admin only)
 exports.getAllUsers = catchAsync(async (req, res) => {
   const users = await User.find().select("-password");
   res.status(200).json({
@@ -12,7 +13,8 @@ exports.getAllUsers = catchAsync(async (req, res) => {
   });
 });
 
-// Approve or reject help requests
+
+// ✅ Approve or reject help requests
 exports.approveRequest = catchAsync(async (req, res, next) => {
   const { requestId, action } = req.body;
   if (!requestId || !["approve", "reject"].includes(action)) {
@@ -37,7 +39,32 @@ exports.approveRequest = catchAsync(async (req, res, next) => {
   });
 });
 
-// Create Admin (Core Admin only)
+
+// ✅ Create Moderator (Core Admin only)
+exports.createModerator = catchAsync(async (req, res, next) => {
+  const { name, email, phone, password } = req.body;
+
+  const role = "moderator"; // fixed role
+
+  const existingUser = await User.findOne({ email });
+  if (existingUser) return next(new AppError("Email already registered", 400));
+
+  const user = await User.create({ name, email, phone, password, role });
+
+  res.status(201).json({
+    status: "success",
+    message: "Moderator created successfully",
+    data: {
+      id: user._id,
+      name: user.name,
+      email: user.email,
+      role: user.role,
+    },
+  });
+});
+
+
+// ✅ Create Admin (Core Admin only — district_lead or moderator)
 exports.createAdmin = catchAsync(async (req, res, next) => {
   const { name, email, phone, password, role } = req.body;
 
@@ -59,7 +86,8 @@ exports.createAdmin = catchAsync(async (req, res, next) => {
   });
 });
 
-// Update user active status
+
+// ✅ Update user active status
 exports.updateUserStatus = catchAsync(async (req, res, next) => {
   const { id } = req.params;
   const { isActive } = req.body;
@@ -82,7 +110,8 @@ exports.updateUserStatus = catchAsync(async (req, res, next) => {
   });
 });
 
-// View all help requests (Moderator, District Lead, Core Admin)
+
+// ✅ View all help requests (Moderator, District Lead, Core Admin)
 exports.viewRequests = catchAsync(async (req, res, next) => {
   const requests = await HelpRequest.find()
     .populate("submittedBy", "name email")

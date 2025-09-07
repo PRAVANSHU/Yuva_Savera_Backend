@@ -2,6 +2,8 @@ const express = require('express');
 const requestController = require('../controllers/requestController');
 const {upload} = require('../middleware/uploadMiddleware'); // <-- multer+cloudinary
 const { protect, restrictTo } = require('../middleware/authMiddleware');
+const { uploadVideo } = require("../middleware/uploadMiddleware");
+
 
 const router = express.Router();
 
@@ -16,7 +18,7 @@ router.use(protect);
 // Request management
 router.post(
   '/',
-  upload.single("video"),       // <-- IMPORTANT: handle video upload
+  uploadVideo.single("video"),       // <-- IMPORTANT: handle video upload
   requestController.createRequest
 );
 

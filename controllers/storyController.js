@@ -1,175 +1,71 @@
-// TODO: Implement success story controllers
-// This file will contain story creation, management, and display logic
+const Story = require("../models/Story");
+const { AppError, catchAsync } = require("../middleware/errorMiddleware");
 
-const storyController = {
-  // Create new success story
-  createStory: async (req, res) => {
-    try {
-      // TODO: Implement story creation logic
-      // - Validate story data
-      // - Handle image uploads (before/after)
-      // - Create story in database
-      // - Update volunteer/beneficiary profiles
-      // - Return created story
-      
-      res.status(201).json({
-        status: 'success',
-        message: 'Success story created successfully',
-        data: {
-          story: {
-            id: 'dummy-story-id',
-            title: req.body.title,
-            description: req.body.description,
-            volunteerName: req.body.volunteerName,
-            helpSeekerName: req.body.helpSeekerName,
-            category: req.body.category,
-            impactMetrics: req.body.impactMetrics,
-            status: 'pending_review',
-            createdAt: new Date().toISOString()
-          }
-        }
-      });
-    } catch (error) {
-      res.status(500).json({
-        status: 'error',
-        message: error.message
-      });
-    }
-  },
+// User submits story → goes as "pending"
+exports.createStory = catchAsync(async (req, res, next) => {
+  const { title, description, volunteerName, helpSeekerName, category, impactMetrics } = req.body;
 
-  // Get all success stories with filters
-  getAllStories: async (req, res) => {
-    try {
-      // TODO: Implement story filtering and pagination
-      // - Apply category filters
-      // - Implement pagination
-      // - Sort by date/featured status
-      
-      const mockStories = [
-        {
-          id: '1',
-          title: 'From Dropout to Engineer',
-          description: 'With the help of our education volunteers, Ramesh completed his 12th grade and is now pursuing engineering.',
-          volunteerName: 'Meera Joshi',
-          helpSeekerName: 'Ramesh Kumar',
-          category: 'Education',
-          impactMetrics: '100% improvement in grades',
-          date: '2024-12-15',
-          featured: true
-        }
-      ];
-
-      res.status(200).json({
-        status: 'success',
-        data: {
-          stories: mockStories,
-          pagination: {
-            currentPage: 1,
-            totalPages: 1,
-            totalStories: mockStories.length
-          }
-        }
-      });
-    } catch (error) {
-      res.status(500).json({
-        status: 'error',
-        message: error.message
-      });
-    }
-  },
-
-  // Get single story by ID
-  getStoryById: async (req, res) => {
-    try {
-      // TODO: Fetch story by ID from database
-      res.status(200).json({
-        status: 'success',
-        data: {
-          story: {
-            id: req.params.id,
-            title: 'From Dropout to Engineer',
-            description: 'With the help of our education volunteers, Ramesh completed his 12th grade and is now pursuing engineering.',
-            volunteerName: 'Meera Joshi',
-            helpSeekerName: 'Ramesh Kumar',
-            category: 'Education',
-            impactMetrics: '100% improvement in grades',
-            date: '2024-12-15',
-            featured: true
-          }
-        }
-      });
-    } catch (error) {
-      res.status(500).json({
-        status: 'error',
-        message: error.message
-      });
-    }
-  },
-
-  // Update story
-  updateStory: async (req, res) => {
-    try {
-      // TODO: Update story in database
-      res.status(200).json({
-        status: 'success',
-        message: 'Story updated successfully',
-        data: {
-          story: {
-            id: req.params.id,
-            ...req.body,
-            updatedAt: new Date().toISOString()
-          }
-        }
-      });
-    } catch (error) {
-      res.status(500).json({
-        status: 'error',
-        message: error.message
-      });
-    }
-  },
-
-  // Delete story
-  deleteStory: async (req, res) => {
-    try {
-      // TODO: Delete story from database
-      res.status(200).json({
-        status: 'success',
-        message: 'Story deleted successfully'
-      });
-    } catch (error) {
-      res.status(500).json({
-        status: 'error',
-        message: error.message
-      });
-    }
-  },
-
-  // Get featured stories
-  getFeaturedStories: async (req, res) => {
-    try {
-      // TODO: Fetch featured stories
-      res.status(200).json({
-        status: 'success',
-        data: {
-          stories: [
-            {
-              id: '1',
-              title: 'From Dropout to Engineer',
-              description: 'With the help of our education volunteers, Ramesh completed his 12th grade and is now pursuing engineering.',
-              category: 'Education',
-              featured: true
-            }
-          ]
-        }
-      });
-    } catch (error) {
-      res.status(500).json({
-        status: 'error',
-        message: error.message
-      });
-    }
+  if (!req.files || !req.files.beforeImage || !req.files.afterImage) {
+    return next(new AppError("Both before and after images are required", 400));
   }
-};
 
-module.exports = storyController;
+  const story = await Story.create({
+    title,
+    description,
+    beforeImage: { url: req.files.beforeImage[0].path, publicId: req.files.beforeImage[0].filename },
+    afterImage: { url: req.files.afterImage[0].path, publicId: req.files.afterImage[0].filename },
+    volunteerName,
+    helpSeekerName,
+    category,
+    impactMetrics,
+    createdBy: req.user._id,
+    status: "pending",
+  });
+
+  res.status(201).json({
+    status: "success",
+    message: "Story submitted successfully. Pending admin approval.",
+    data: { story },
+  });
+});
+
+// Public: Get only approved stories
+exports.getAllStories = catchAsync(async (req, res) => {
+  const stories = await Story.find({ status: "approved" }).sort({ createdAt: -1 });
+  res.status(200).json({
+    status: "success",
+    results: stories.length,
+    data: { stories },
+  });
+});
+
+// Get single approved story
+exports.getStoryById = catchAsync(async (req, res, next) => {
+  const story = await Story.findById(req.params.id);
+  if (!story) return next(new AppError("Story not found", 404));
+  if (story.status !== "approved") return next(new AppError("Story not approved yet", 403));
+
+  res.status(200).json({
+    status: "success",
+    data: { story },
+  });
+});
+
+// Admin: Get all pending stories
+exports.getPendingStories = catchAsync(async (req, res) => {
+  const stories = await Story.find({ status: "pending" })
+    .populate("createdBy", "name email");
+  res.json({ status: "success", data: { stories } });
+});
+
+// Admin: Approve / Reject
+exports.updateStoryStatus = catchAsync(async (req, res, next) => {
+  const { action } = req.body; // "approve" or "reject"
+  const story = await Story.findById(req.params.id);
+  if (!story) return next(new AppError("Story not found", 404));
+
+  story.status = action === "approve" ? "approved" : "rejected";
+  await story.save();
+
+  res.json({ status: "success", message: `Story ${action}d successfully`, data: { story } });
+});

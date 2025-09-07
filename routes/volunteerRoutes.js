@@ -8,11 +8,11 @@ const router = express.Router();
 // ---------------- Public routes ----------------
 router.get('/leaderboard', volunteerController.getLeaderboard);
 
-// ---------------- Protected routes ----------------
-router.use(protect);
-
 // Volunteer registration with file upload (idProof)
 router.post('/register', uploadFile.single('idProof'), volunteerController.registerVolunteer);
+
+// ---------------- Protected routes ----------------
+router.use(protect);
 
 // Volunteer profile & dashboard
 router.get('/profile/:id', volunteerController.getVolunteerProfile);

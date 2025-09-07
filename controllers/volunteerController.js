@@ -15,28 +15,42 @@ const volunteerController = {
         email,
         phone,
         location,
-        skills,
-        causes,
         availability,
         experience,
         motivation,
         password
       } = req.body;
 
-      if (!name || !email || !phone || !skills?.length || !causes?.length || !availability || !motivation || !password || !location) {
+      // Parse arrays sent as JSON strings
+      const skills = req.body.skills ? JSON.parse(req.body.skills) : [];
+      const causes = req.body.causes ? JSON.parse(req.body.causes) : [];
+
+      // Required field validation
+      if (!name || !email || !phone || skills.length === 0 || causes.length === 0 || !availability || !motivation || !location) {
         return res.status(400).json({ status: 'fail', message: 'All required fields must be provided' });
       }
 
       const hashedPassword = await bcrypt.hash(password, 12);
 
+      // Create user (no password required yet)
       const user = await User.create({
         name,
         email,
         phone,
         role: 'volunteer',
-        password: hashedPassword
+        password: hashedPassword // password will be set after approval if needed
       });
 
+      // Handle optional file
+      let idProof = null;
+      if (req.file) {
+        idProof = {
+          url: `/uploads/${req.file.filename}`, // adjust according to your storage
+          type: req.file.mimetype
+        };
+      }
+
+      // Create volunteer record
       const volunteer = await Volunteer.create({
         userId: user._id,
         skills,
@@ -45,7 +59,8 @@ const volunteerController = {
         availability,
         experience,
         motivation,
-        status: 'pending_review'
+        status: 'pending_review',
+        ...(idProof && { idProof }) // include only if file exists
       });
 
       res.status(201).json({
@@ -53,6 +68,7 @@ const volunteerController = {
         message: 'Volunteer registered successfully',
         data: { volunteer }
       });
+
     } catch (error) {
       console.error(error);
       res.status(500).json({ status: 'error', message: error.message });
@@ -110,7 +126,6 @@ const volunteerController = {
   // Get volunteer dashboard data
   getVolunteerDashboard: async (req, res) => {
     try {
-      // TODO: Replace with real contribution data
       res.status(200).json({
         status: 'success',
         data: {
@@ -175,45 +190,44 @@ const volunteerController = {
     }
   },
 
-// Add a new volunteer (admin)
-addNewVolunteer: async (req, res) => {
-  try {
-    const { name, email, phone, password, skills, causes, availability, motivation, location } = req.body;
+  // Add a new volunteer (admin)
+  addNewVolunteer: async (req, res) => {
+    try {
+      const { name, email, phone, password, skills, causes, availability, motivation, location } = req.body;
 
-    // Only enforce basic fields for admin
-    if (!name || !email || !phone || !password) {
-      return res.status(400).json({ status: 'fail', message: 'Name, email, phone and password are required' });
+      if (!name || !email || !phone || !password) {
+        return res.status(400).json({ status: 'fail', message: 'Name, email, phone and password are required' });
+      }
+
+      const hashedPassword = await bcrypt.hash(password, 12);
+
+      const user = await User.create({
+        name,
+        email,
+        phone,
+        role: 'volunteer',
+        password: hashedPassword
+      });
+
+      const volunteer = await Volunteer.create({
+        userId: user._id,
+        skills: skills && skills.length ? skills : ['General'],
+        causesOfInterest: causes && causes.length ? causes : ['General'],
+        location: location || 'Not Provided',
+        availability: availability || 'flexible',
+        motivation: motivation || 'N/A',
+        status: 'approved'  // admin-created volunteers are automatically approved
+      });
+
+      res.status(201).json({
+        status: 'success',
+        message: 'Volunteer added successfully',
+        data: { volunteer }
+      });
+    } catch (error) {
+      res.status(500).json({ status: 'error', message: error.message });
     }
-
-    const hashedPassword = await bcrypt.hash(password, 12);
-
-    const user = await User.create({
-      name,
-      email,
-      phone,
-      role: 'volunteer',
-      password: hashedPassword
-    });
-
-    const volunteer = await Volunteer.create({
-      userId: user._id,
-      skills: skills && skills.length ? skills : ['General'],
-      causesOfInterest: causes && causes.length ? causes : ['General'],
-      location: location || 'Not Provided',
-      availability: availability || 'flexible',
-      motivation: motivation || 'N/A',
-      status: 'approved'  // admin-created volunteers are automatically approved
-    });
-
-    res.status(201).json({
-      status: 'success',
-      message: 'Volunteer added successfully',
-      data: { volunteer }
-    });
-  } catch (error) {
-    res.status(500).json({ status: 'error', message: error.message });
-  }
-},
+  },
 
   // Activate/Deactivate volunteer
   toggleVolunteerStatus: async (req, res) => {
@@ -223,7 +237,6 @@ addNewVolunteer: async (req, res) => {
         return res.status(404).json({ status: 'fail', message: 'Volunteer not found' });
       }
 
-      // Better: toggle between approved <-> inactive, else allow admin to set explicitly
       volunteer.status = volunteer.status === 'approved' ? 'inactive' : 'approved';
       await volunteer.save();
 

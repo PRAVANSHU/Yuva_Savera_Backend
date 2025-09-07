@@ -46,7 +46,7 @@ app.use('/api/admin', adminRoutes);
 app.use('/api/public', publicRoutes);
 app.use("/api/contact", contactRoutes);
 app.use("/api/reports", reportRoutes);
-app.use('/api/volunteers', volunteerRoutes);
+app.use('/api/volunteer', volunteerRoutes);
 
 // Health check endpoint
 app.get("/api/health", (req, res) => {

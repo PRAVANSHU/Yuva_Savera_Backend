@@ -7,7 +7,7 @@ const volunteerSchema = new mongoose.Schema({
     required: true,
     unique: true
   },
-  name: { type: String },  // optional, can be populated from User
+  name: { type: String },
   email: { type: String },
   phone: { type: String },
   location: { type: String, required: true },
@@ -29,7 +29,8 @@ const volunteerSchema = new mongoose.Schema({
   idProof: {
     url: String,
     publicId: String,
-    type: { type: String, enum: ['aadhaar', 'driving_license', 'passport'] }
+    docType: { type: String, enum: ['aadhaar', 'driving_license', 'passport'] }, // ✅ document type
+    mimeType: String // ✅ file type (image/png, application/pdf)
   },
   points: { type: Number, default: 0, min: 0 },
   badges: [{

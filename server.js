@@ -1,18 +1,19 @@
+require("dotenv").config();
 const express = require("express");
 const cors = require("cors");
 const helmet = require("helmet");
 const rateLimit = require("express-rate-limit");
-require("dotenv").config();
+const storyRoutes = require("./routes/storyRoutes");
+
 
 // Import routes
 const authRoutes = require("./routes/authRoutes");
 const requestRoutes = require("./routes/requestRoutes");
-const adminRoutes = require("./routes/adminRoutes");
-const publicRoutes = require("./routes/public");
-const storyRoutes = require("./routes/storyRoutes");
+const adminRoutes = require('./routes/adminRoutes');
+const publicRoutes = require('./routes/public');
 const contactRoutes = require("./routes/contactRoutes");
 const reportRoutes = require("./routes/reportRoutes");
-const volunteerRoutes = require("./routes/volunteerRoutes");
+const volunteerRoutes = require('./routes/volunteerRoutes');
 
 // Import middleware
 const { errorHandler } = require("./middleware/errorMiddleware");
@@ -32,35 +33,26 @@ app.use(cors());
 app.use(express.json({ limit: "10mb" }));
 app.use(express.urlencoded({ extended: true }));
 
-// ✅ Rate limiting only for auth routes
-const authLimiter = rateLimit({
-  windowMs: 15 * 60 * 1000,
-  max: 10, // 10 login/signup attempts per 15 minutes
-  message: "Too many login attempts, please try again later.",
+// Rate limiting
+const limiter = rateLimit({
+  windowMs: 15 * 60 * 1000, // 15 minutes
+  max: 100, // limit each IP
+  message: "Too many requests, please try again later.",
 });
-app.use("/api/auth/login", authLimiter);
-app.use("/api/auth/register", authLimiter);
-
-
-app.use((req, res, next) => {
-  console.log(`[REQ] ${new Date().toISOString()} ${req.method} ${req.originalUrl}`, {
-    authorization: req.headers.authorization,
-    host: req.headers.host
-  });
-  next();
-});
+app.use("/api/", limiter);
 
 // Routes
 app.use("/api/auth", authRoutes);
 app.use("/api/requests", requestRoutes);
-app.use("/api/admin", adminRoutes);
-app.use("/api/public", publicRoutes);
-app.use("/api/stories", storyRoutes);
+app.use('/api/admin', adminRoutes);
+app.use('/api/public', publicRoutes);
 app.use("/api/contact", contactRoutes);
 app.use("/api/reports", reportRoutes);
 app.use('/api/volunteer', volunteerRoutes);
+app.use("/api/stories", storyRoutes);
 
-// Health check
+
+// Health check endpoint
 app.get("/api/health", (req, res) => {
   res.status(200).json({
     status: "success",
@@ -79,7 +71,7 @@ app.get("/", (req, res) => {
   });
 });
 
-// Error handling
+// Error handling middleware
 app.use(errorHandler);
 
 // 404 handler

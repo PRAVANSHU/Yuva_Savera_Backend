@@ -2,21 +2,47 @@ const multer = require("multer");
 const { CloudinaryStorage } = require("multer-storage-cloudinary");
 const cloudinary = require("../config/cloudinary");
 
-// Configure Cloudinary Storage
-const storage = new CloudinaryStorage({
+// For stories (images)
+const storyStorage = new CloudinaryStorage({
   cloudinary,
-  params: async (req, file) => {
-    return {
-      folder: "yuva_savera_uploads",
-      resource_type: "auto", // auto-detect image/video/pdf
-      allowed_formats: ["jpg", "jpeg", "png", "pdf", "mp4", "avi", "mkv", "mov"],
-      public_id: `${Date.now()}-${file.originalname.split(".")[0]}`,
-    };
+  params: {
+    folder: "yuva_savera_stories",
+    resource_type: "image",
+    allowed_formats: ["jpg", "jpeg", "png"],
+    public_id: (req, file) =>
+      `${Date.now()}-${file.originalname.split(".")[0]}`,
   },
 });
+const uploadStory = multer({ storage: storyStorage });
 
-// ✅ This is the multer instance
-const upload = multer({ storage });
+// For volunteers (id proof, docs)
+const fileStorage = new CloudinaryStorage({
+  cloudinary,
+  params: {
+    folder: "yuva_savera_volunteers",
+    resource_type: "auto",
+    allowed_formats: ["jpeg", "jpg", "png", "pdf"],
+    public_id: (req, file) =>
+      `${Date.now()}-${file.originalname.split(".")[0]}`,
+  },
+});
+const uploadFile = multer({ storage: fileStorage });
 
-// Export consistently
-module.exports = upload;
+// For requests (videos)
+const videoStorage = new CloudinaryStorage({
+  cloudinary,
+  params: {
+    folder: "yuva_savera_videos",
+    resource_type: "video",
+    allowed_formats: ["mp4", "avi", "mkv", "mov"],
+    public_id: (req, file) =>
+      `${Date.now()}-${file.originalname.split(".")[0]}`,
+  },
+});
+const uploadVideo = multer({ storage: videoStorage });
+
+module.exports = {
+  uploadStory, // for stories
+  uploadFile,  // for volunteers
+  uploadVideo, // ✅ for request videos
+};

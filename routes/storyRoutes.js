@@ -1,27 +1,27 @@
 const express = require("express");
-const storyController = require("../controllers/storyController");
-const { protect, restrictTo } = require("../middleware/authMiddleware");
-const upload = require("../middleware/uploadMiddleware");
-
 const router = express.Router();
+const storyController = require("../controllers/storyController");
+const { uploadStory } = require("../middleware/uploadMiddleware"); // ✅ destructure
+const { protect } = require("../middleware/authMiddleware");
 
-// Public routes
-router.get("/", storyController.getAllStories);
-router.get("/:id", storyController.getStoryById);
 
-// Protected: User submits story
+// Story submission route
 router.post(
   "/",
   protect,
-  upload.fields([
+  uploadStory.fields([
     { name: "beforeImage", maxCount: 1 },
     { name: "afterImage", maxCount: 1 },
   ]),
   storyController.createStory
 );
 
+// Public routes
+router.get("/", storyController.getAllStories);
+router.get("/:id", storyController.getStoryById);
+
 // Admin routes
-router.get("/admin/pending", protect, restrictTo("core_admin"), storyController.getPendingStories);
-router.patch("/admin/:id/status", protect, restrictTo("core_admin"), storyController.updateStoryStatus);
+router.get("/admin/pending", storyController.getPendingStories);
+router.patch("/:id/status", storyController.updateStoryStatus);
 
 module.exports = router;

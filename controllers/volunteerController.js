@@ -7,74 +7,93 @@ const volunteerController = {
   // Volunteer self-service routes
   // ========================
 
-  // Register as volunteer (self-service)
   registerVolunteer: async (req, res) => {
-    try {
-      const {
-        name,
-        email,
-        phone,
-        location,
-        availability,
-        experience,
-        motivation,
-        password
-      } = req.body;
+  try {
+    console.log("====== 📥 New Volunteer Registration Request ======");
+    console.log("➡ Raw body:", req.body);
+    console.log("➡ Uploaded file:", req.file);
 
-      // Parse arrays sent as JSON strings
-      const skills = req.body.skills ? JSON.parse(req.body.skills) : [];
-      const causes = req.body.causes ? JSON.parse(req.body.causes) : [];
+    const {
+      name,
+      email,
+      phone,
+      location,
+      availability,
+      experience,
+      motivation,
+      password,
+      idProofType // ✅ new field from frontend
+    } = req.body;
 
-      // Required field validation
-      if (!name || !email || !phone || skills.length === 0 || causes.length === 0 || !availability || !motivation || !location) {
-        return res.status(400).json({ status: 'fail', message: 'All required fields must be provided' });
-      }
+    // Parse arrays sent as JSON strings
+    const skills = req.body.skills ? JSON.parse(req.body.skills) : [];
+    const causes = req.body.causes ? JSON.parse(req.body.causes) : [];
 
-      const hashedPassword = await bcrypt.hash(password, 12);
+    console.log("➡ Parsed skills:", skills);
+    console.log("➡ Parsed causes:", causes);
 
-      // Create user (no password required yet)
-      const user = await User.create({
-        name,
-        email,
-        phone,
-        role: 'volunteer',
-        password: hashedPassword // password will be set after approval if needed
-      });
-
-      // Handle optional file
-      let idProof = null;
-      if (req.file) {
-        idProof = {
-          url: `/uploads/${req.file.filename}`, // adjust according to your storage
-          type: req.file.mimetype
-        };
-      }
-
-      // Create volunteer record
-      const volunteer = await Volunteer.create({
-        userId: user._id,
-        skills,
-        causesOfInterest: causes,
-        location,
-        availability,
-        experience,
-        motivation,
-        status: 'pending_review',
-        ...(idProof && { idProof }) // include only if file exists
-      });
-
-      res.status(201).json({
-        status: 'success',
-        message: 'Volunteer registered successfully',
-        data: { volunteer }
-      });
-
-    } catch (error) {
-      console.error(error);
-      res.status(500).json({ status: 'error', message: error.message });
+    // Required field validation
+    if (!name || !email || !phone || skills.length === 0 || causes.length === 0 || !availability || !motivation || !location) {
+      return res.status(400).json({ status: "fail", message: "All required fields must be provided" });
     }
-  },
 
+    // Check if user exists
+    const existingUser = await User.findOne({ email });
+    if (existingUser) {
+      console.warn("⚠ Duplicate email attempt:", email);
+      return res.status(400).json({ status: "fail", message: "Email already registered" });
+    }
+
+    const hashedPassword = await bcrypt.hash(password, 12);
+
+    // Create user
+    const user = await User.create({
+      name,
+      email,
+      phone,
+      role: "volunteer",
+      password: hashedPassword
+    });
+
+    console.log("✅ User created:", user._id);
+
+    // Handle optional file
+    let idProof = null;
+    if (req.file) {
+      idProof = {
+        url: req.file.path || req.file.secure_url,
+        publicId: req.file.filename || req.file.public_id,
+        docType: idProofType || "aadhaar", // ✅ must be from enum
+        mimeType: req.file.mimetype
+      };
+    }
+    console.log("➡ Final idProof object:", idProof);
+
+    // Create volunteer record
+    const volunteer = await Volunteer.create({
+      userId: user._id,
+      skills,
+      causesOfInterest: causes,
+      location,
+      availability,
+      experience,
+      motivation,
+      status: "pending_review",
+      ...(idProof && { idProof })
+    });
+
+    res.status(201).json({
+      status: "success",
+      message: "Volunteer registered successfully",
+      data: { volunteer }
+    });
+
+  } catch (error) {
+    console.error("❌ registerVolunteer error message:", error.message);
+    console.error("❌ registerVolunteer error stack:", error.stack);
+    res.status(500).json({ status: "error", message: error.message });
+  }
+},
   // Get volunteer profile
   getVolunteerProfile: async (req, res) => {
     try {
@@ -88,6 +107,7 @@ const volunteerController = {
 
       res.status(200).json({ status: 'success', data: { volunteer } });
     } catch (error) {
+      console.error("❌ getVolunteerProfile error:", error);
       res.status(500).json({ status: 'error', message: error.message });
     }
   },
@@ -101,7 +121,7 @@ const volunteerController = {
       allowedFields.forEach(field => {
         if (req.body[field] !== undefined) {
           if (field === 'causes') {
-            updates['causesOfInterest'] = req.body[field]; // map causes → causesOfInterest
+            updates['causesOfInterest'] = req.body[field];
           } else {
             updates[field] = req.body[field];
           }
@@ -119,6 +139,7 @@ const volunteerController = {
         data: { volunteer }
       });
     } catch (error) {
+      console.error("❌ updateVolunteerProfile error:", error);
       res.status(500).json({ status: 'error', message: error.message });
     }
   },
@@ -143,6 +164,7 @@ const volunteerController = {
         }
       });
     } catch (error) {
+      console.error("❌ getVolunteerDashboard error:", error);
       res.status(500).json({ status: 'error', message: error.message });
     }
   },
@@ -165,6 +187,7 @@ const volunteerController = {
 
       res.status(200).json({ status: 'success', data: { leaderboard } });
     } catch (error) {
+      console.error("❌ getLeaderboard error:", error);
       res.status(500).json({ status: 'error', message: error.message });
     }
   },
@@ -186,6 +209,7 @@ const volunteerController = {
         data: { volunteers }
       });
     } catch (error) {
+      console.error("❌ getAllVolunteers error:", error);
       res.status(500).json({ status: 'error', message: error.message });
     }
   },
@@ -216,7 +240,7 @@ const volunteerController = {
         location: location || 'Not Provided',
         availability: availability || 'flexible',
         motivation: motivation || 'N/A',
-        status: 'approved'  // admin-created volunteers are automatically approved
+        status: 'approved'
       });
 
       res.status(201).json({
@@ -225,6 +249,7 @@ const volunteerController = {
         data: { volunteer }
       });
     } catch (error) {
+      console.error("❌ addNewVolunteer error:", error);
       res.status(500).json({ status: 'error', message: error.message });
     }
   },
@@ -246,6 +271,7 @@ const volunteerController = {
         data: { volunteer }
       });
     } catch (error) {
+      console.error("❌ toggleVolunteerStatus error:", error);
       res.status(500).json({ status: 'error', message: error.message });
     }
   }

@@ -1,33 +1,38 @@
-const express = require("express");
-const volunteerController = require("../controllers/volunteerController");
-const { protect, restrictTo } = require("../middleware/authMiddleware");
+const express = require('express');
+const volunteerController = require('../controllers/volunteerController');
+const { protect, restrictTo } = require('../middleware/authMiddleware');
+const { uploadFile } = require('../middleware/uploadMiddleware');
 
 const router = express.Router();
 
-// ========================
-// Public routes
-// ========================
-router.get("/leaderboard", volunteerController.getLeaderboard);
+// ---------------- Public routes ----------------
+router.get('/leaderboard', volunteerController.getLeaderboard);
 
-// ========================
-// Protected routes (volunteer must be logged in)
-// ========================
+// ---------------- Protected routes ----------------
 router.use(protect);
 
-// Volunteer self-service routes
-router.post("/register", volunteerController.registerVolunteer);
-router.get("/profile/:id", volunteerController.getVolunteerProfile);
-router.patch("/profile/:id", volunteerController.updateVolunteerProfile);
-router.get("/dashboard", volunteerController.getVolunteerDashboard);
+// Volunteer registration with file upload (idProof)
+router.post('/register', uploadFile.single('idProof'), volunteerController.registerVolunteer);
 
-// ========================
-// Admin only routes
-// ========================
-router.use(restrictTo("admin", "core_admin"));
+// Volunteer profile & dashboard
+router.get('/profile/:id', volunteerController.getVolunteerProfile);
+router.patch('/profile/:id', volunteerController.updateVolunteerProfile);
+router.get('/dashboard', volunteerController.getVolunteerDashboard);
 
-// Core admin volunteer management
-router.get("/", volunteerController.getAllVolunteers); // View all volunteers
-router.post("/", volunteerController.addNewVolunteer); // Add new volunteer
-router.patch("/:id/status", volunteerController.toggleVolunteerStatus); // Activate/Deactivate volunteer
+// ---------------- Future features (commented for now) ----------------
+// router.get('/opportunities', volunteerController.getOpportunities);
+// router.post('/apply/:requestId', volunteerController.applyForRequest);
+// router.get('/applications', volunteerController.getMyApplications);
+// router.patch('/applications/:id/withdraw', volunteerController.withdrawApplication);
+// router.get('/contributions', volunteerController.getContributions);
+// router.post('/contributions/:id/feedback', volunteerController.submitFeedback);
+
+// ---------------- Admin only routes ----------------
+router.use(restrictTo('admin'));
+// router.get('/', volunteerController.getAllVolunteers);
+// router.patch('/:id/approve', volunteerController.approveVolunteer);
+// router.patch('/:id/suspend', volunteerController.suspendVolunteer);
+// router.patch('/:id/points', volunteerController.updatePoints);
+// router.post('/:id/badges', volunteerController.awardBadge);
 
 module.exports = router;

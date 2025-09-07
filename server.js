@@ -4,6 +4,7 @@ const cors = require("cors");
 const helmet = require("helmet");
 const rateLimit = require("express-rate-limit");
 const storyRoutes = require("./routes/storyRoutes");
+const moderatorRoutes = require("./routes/moderatorRoutes");
 
 
 // Import routes
@@ -51,6 +52,8 @@ app.use("/api/reports", reportRoutes);
 app.use('/api/volunteer', volunteerRoutes);
 app.use("/api/stories", storyRoutes);
 app.use("/api/dashboard", require("./routes/dashboardRoutes"));
+app.use("/api/moderator", moderatorRoutes);
+
 
 
 // Health check endpoint

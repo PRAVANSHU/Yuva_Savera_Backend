@@ -10,6 +10,9 @@ router.use(protect);
 // Core Admin only
 router.get('/users', restrictTo('core_admin'), adminController.getAllUsers);
 router.post('/create-admin', restrictTo('core_admin'), adminController.createAdmin);
+// Core Admin only
+router.post('/create-moderator', restrictTo('core_admin'), adminController.createModerator);
+
 
 // District Lead & Core Admin
 router.post('/approve-request', restrictTo('district_lead', 'core_admin'), adminController.approveRequest);

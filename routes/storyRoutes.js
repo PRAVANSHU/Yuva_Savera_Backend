@@ -1,39 +1,27 @@
-const express = require('express');
-const storyController = require('../controllers/storyController');
-const { protect, restrictTo } = require('../middleware/authMiddleware');
+const express = require("express");
+const storyController = require("../controllers/storyController");
+const { protect, restrictTo } = require("../middleware/authMiddleware");
+const upload = require("../middleware/uploadMiddleware");
 
 const router = express.Router();
 
-// TODO: Define success story routes
-// These routes will handle story creation, management, and display
-
 // Public routes
-router.get('/', storyController.getAllStories);
-router.get('/featured', storyController.getFeaturedStories);
-router.get('/:id', storyController.getStoryById);
+router.get("/", storyController.getAllStories);
+router.get("/:id", storyController.getStoryById);
 
-// Protected routes
-router.use(protect);
+// Protected: User submits story
+router.post(
+  "/",
+  protect,
+  upload.fields([
+    { name: "beforeImage", maxCount: 1 },
+    { name: "afterImage", maxCount: 1 },
+  ]),
+  storyController.createStory
+);
 
-// Story management
-router.post('/', storyController.createStory);
-router.patch('/:id', storyController.updateStory);
-router.delete('/:id', storyController.deleteStory);
-
-// TODO: Add these routes when implementing full functionality
-// router.get('/my-stories', storyController.getMyStories);
-// router.post('/:id/like', storyController.likeStory);
-// router.delete('/:id/like', storyController.unlikeStory);
-// router.post('/:id/comments', storyController.addComment);
-// router.delete('/:id/comments/:commentId', storyController.deleteComment);
-// router.post('/:id/share', storyController.shareStory);
-// router.post('/:id/report', storyController.reportStory);
-
-// Admin only routes
-router.use(restrictTo('admin'));
-// router.patch('/:id/approve', storyController.approveStory);
-// router.patch('/:id/feature', storyController.featureStory);
-// router.patch('/:id/unfeature', storyController.unfeatureStory);
-// router.get('/admin/pending', storyController.getPendingStories);
+// Admin routes
+router.get("/admin/pending", protect, restrictTo("core_admin"), storyController.getPendingStories);
+router.patch("/admin/:id/status", protect, restrictTo("core_admin"), storyController.updateStoryStatus);
 
 module.exports = router;

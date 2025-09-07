@@ -26,6 +26,7 @@ router.get("/dashboard", volunteerController.getVolunteerDashboard);
 
 // ---------------- Admin only routes ----------------
 router.use(restrictTo("admin", "core_admin"));
+router.post("/add", volunteerController.addNewVolunteer);
 router.get("/", volunteerController.getAllVolunteers);
 
 // Approve/Reject (status column)

@@ -50,6 +50,7 @@ app.use("/api/contact", contactRoutes);
 app.use("/api/reports", reportRoutes);
 app.use('/api/volunteer', volunteerRoutes);
 app.use("/api/stories", storyRoutes);
+app.use("/api/dashboard", require("./routes/dashboardRoutes"));
 
 
 // Health check endpoint

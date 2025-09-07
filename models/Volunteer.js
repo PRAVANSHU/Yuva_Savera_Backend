@@ -1,6 +1,5 @@
 const mongoose = require('mongoose');
 
-// TODO: Define Volunteer schema extending User data
 const volunteerSchema = new mongoose.Schema({
   userId: {
     type: mongoose.Schema.Types.ObjectId,
@@ -8,14 +7,18 @@ const volunteerSchema = new mongoose.Schema({
     required: true,
     unique: true
   },
-  skills: [{
+  location: {
     type: String,
     required: true
-  }],
-  causesOfInterest: [{
-    type: String,
-    required: true
-  }],
+  },
+  skills: {
+    type: [String],
+    validate: [arr => arr.length > 0, 'At least one skill is required']
+  },
+  causesOfInterest: {
+    type: [String],
+    validate: [arr => arr.length > 0, 'At least one cause of interest is required']
+  },
   availability: {
     type: String,
     enum: ['weekends', 'evenings', 'flexible', 'full-time'],
@@ -33,7 +36,10 @@ const volunteerSchema = new mongoose.Schema({
   idProof: {
     url: String,
     publicId: String,
-    type: String // 'aadhaar', 'driving_license', 'passport'
+    type: {
+      type: String,
+      enum: ['aadhaar', 'driving_license', 'passport']
+    }
   },
   points: {
     type: Number,
@@ -71,23 +77,11 @@ const volunteerSchema = new mongoose.Schema({
   },
   preferences: {
     notifications: {
-      email: {
-        type: Boolean,
-        default: true
-      },
-      sms: {
-        type: Boolean,
-        default: false
-      },
-      push: {
-        type: Boolean,
-        default: true
-      }
+      email: { type: Boolean, default: true },
+      sms: { type: Boolean, default: false },
+      push: { type: Boolean, default: true }
     },
-    maxDistance: {
-      type: Number,
-      default: 50 // kilometers
-    }
+    maxDistance: { type: Number, default: 50 }
   }
 }, {
   timestamps: true,
@@ -96,7 +90,6 @@ const volunteerSchema = new mongoose.Schema({
 });
 
 // Indexes
-volunteerSchema.index({ userId: 1 });
 volunteerSchema.index({ skills: 1 });
 volunteerSchema.index({ causesOfInterest: 1 });
 volunteerSchema.index({ status: 1 });
@@ -110,10 +103,15 @@ volunteerSchema.virtual('user', {
   justOne: true
 });
 
+// Auto-populate user info
+volunteerSchema.pre(/^find/, function(next) {
+  this.populate('user', 'name email phone');
+  next();
+});
+
 // Method to add points
 volunteerSchema.methods.addPoints = function(points, reason) {
   this.points += points;
-  // TODO: Add to contribution history
   return this.save();
 };
 

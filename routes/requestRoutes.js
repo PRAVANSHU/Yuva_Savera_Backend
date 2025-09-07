@@ -24,6 +24,7 @@ router.patch('/:id/assign', requestController.assignVolunteer);
 router.patch('/:id/status', requestController.updateRequestStatus);
 
 // Admin routes
-router.use(restrictTo('admin'));
+router.use(restrictTo('core_admin', 'district_lead', 'moderator'));
+router.patch("/:id/admin-status", requestController.adminApproveReject);
 
 module.exports = router;

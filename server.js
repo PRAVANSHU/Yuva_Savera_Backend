@@ -9,6 +9,9 @@ const authRoutes = require("./routes/authRoutes");
 const requestRoutes = require("./routes/requestRoutes");
 const adminRoutes = require('./routes/adminRoutes');
 const publicRoutes = require('./routes/public');
+const contactRoutes = require("./routes/contactRoutes");
+const reportRoutes = require("./routes/reportRoutes");
+const volunteerRoutes = require('./routes/volunteerRoutes');
 
 // Import middleware
 const { errorHandler } = require("./middleware/errorMiddleware");
@@ -41,6 +44,9 @@ app.use("/api/auth", authRoutes);
 app.use("/api/requests", requestRoutes);
 app.use('/api/admin', adminRoutes);
 app.use('/api/public', publicRoutes);
+app.use("/api/contact", contactRoutes);
+app.use("/api/reports", reportRoutes);
+app.use('/api/volunteers', volunteerRoutes);
 
 // Health check endpoint
 app.get("/api/health", (req, res) => {

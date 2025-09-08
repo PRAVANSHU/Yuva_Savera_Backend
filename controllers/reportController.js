@@ -65,3 +65,44 @@ exports.updateReportStatus = catchAsync(async (req, res, next) => {
     data: report,
   });
 });
+
+// Moderator → fetch reports
+exports.getAllReportsForModerator = catchAsync(async (req, res) => {
+  const reports = await Report.find()
+    .populate("submittedBy", "name email")
+    .populate("targetId") // HelpRequest or User
+    .sort({ createdAt: -1 });
+
+  res.status(200).json({
+    status: "success",
+    results: reports.length,
+    reports,
+  });
+});
+
+// Moderator → update status (restricted)
+exports.updateReportStatusForModerator = catchAsync(async (req, res, next) => {
+  const { id } = req.params;
+  const { status } = req.body;
+
+  if (!["pending", "reviewed", "resolved"].includes(status)) {
+    return next(new AppError("Invalid status", 400));
+  }
+
+  const report = await Report.findById(id);
+  if (!report) return next(new AppError("Report not found", 404));
+
+  // Moderators cannot reset "resolved" back to pending
+  if (report.status === "resolved" && status === "pending") {
+    return next(new AppError("Not allowed to reopen resolved reports", 403));
+  }
+
+  report.status = status;
+  await report.save();
+
+  res.status(200).json({
+    status: "success",
+    message: `Report marked as ${status} by moderator`,
+    data: report,
+  });
+});

@@ -14,6 +14,7 @@ const publicRoutes = require('./routes/public');
 const contactRoutes = require("./routes/contactRoutes");
 const reportRoutes = require("./routes/reportRoutes");
 const volunteerRoutes = require('./routes/volunteerRoutes');
+const moderatorRoutes = require("./routes/moderatorRoutes");
 
 // Import middleware
 const { errorHandler } = require("./middleware/errorMiddleware");
@@ -51,6 +52,7 @@ app.use("/api/reports", reportRoutes);
 app.use('/api/volunteer', volunteerRoutes);
 app.use("/api/stories", storyRoutes);
 app.use("/api/dashboard", require("./routes/dashboardRoutes"));
+app.use("/api/moderator", moderatorRoutes);
 
 
 // Health check endpoint

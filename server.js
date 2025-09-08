@@ -4,7 +4,6 @@ const cors = require("cors");
 const helmet = require("helmet");
 const rateLimit = require("express-rate-limit");
 const storyRoutes = require("./routes/storyRoutes");
-const moderatorRoutes = require("./routes/moderatorRoutes");
 
 
 // Import routes

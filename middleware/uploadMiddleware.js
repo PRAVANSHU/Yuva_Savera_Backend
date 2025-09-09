@@ -41,8 +41,22 @@ const videoStorage = new CloudinaryStorage({
 });
 const uploadVideo = multer({ storage: videoStorage });
 
+
+// NEW: campaign storage (keeps assets separated)
+const campaignStorage = new CloudinaryStorage({
+  cloudinary,
+  params: {
+    folder: "yuva_savera_campaigns",
+    resource_type: "image",
+    allowed_formats: ["jpg", "jpeg", "png", "webp"],
+    public_id: (req, file) => `${Date.now()}-${file.originalname.split(".")[0]}`,
+  },
+});
+const uploadCampaign = multer({ storage: campaignStorage });
+
 module.exports = {
   uploadStory, // for stories
   uploadFile,  // for volunteers
-  uploadVideo, // ✅ for request videos
+  uploadVideo,
+  uploadCampaign, 
 };

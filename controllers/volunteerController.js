@@ -8,41 +8,41 @@ const volunteerController = {
   // ========================
 
   registerVolunteer: async (req, res) => {
-  try {
-    console.log("====== 📥 New Volunteer Registration Request ======");
-    console.log("➡ Raw body:", req.body);
-    console.log("➡ Uploaded file:", req.file);
+    try {
+      console.log("====== 📥 New Volunteer Registration Request ======");
+      console.log("➡ Raw body:", req.body);
+      console.log("➡ Uploaded file:", req.file);
 
-    const {
-      name,
-      email,
-      phone,
-      location,
-      availability,
-      experience,
-      motivation,
-      password,
-      idProofType // ✅ new field from frontend
-    } = req.body;
+      const {
+        name,
+        email,
+        phone,
+        location,
+        availability,
+        experience,
+        motivation,
+        password,
+        idProofType // ✅ new field from frontend
+      } = req.body;
 
-    // Parse arrays sent as JSON strings
-    const skills = req.body.skills ? JSON.parse(req.body.skills) : [];
-    const causes = req.body.causes ? JSON.parse(req.body.causes) : [];
+      // Parse arrays sent as JSON strings
+      const skills = req.body.skills ? JSON.parse(req.body.skills) : [];
+      const causes = req.body.causes ? JSON.parse(req.body.causes) : [];
 
-    console.log("➡ Parsed skills:", skills);
-    console.log("➡ Parsed causes:", causes);
+      console.log("➡ Parsed skills:", skills);
+      console.log("➡ Parsed causes:", causes);
 
-    // Required field validation
-    if (!name || !email || !phone || skills.length === 0 || causes.length === 0 || !availability || !motivation || !location) {
-      return res.status(400).json({ status: "fail", message: "All required fields must be provided" });
-    }
+      // Required field validation
+      if (!name || !email || !phone || skills.length === 0 || causes.length === 0 || !availability || !motivation || !location) {
+        return res.status(400).json({ status: "fail", message: "All required fields must be provided" });
+      }
 
-    // Check if user exists
-    const existingUser = await User.findOne({ email });
-    if (existingUser) {
-      console.warn("⚠ Duplicate email attempt:", email);
-      return res.status(400).json({ status: "fail", message: "Email already registered" });
-    }
+      // Check if user exists
+      const existingUser = await User.findOne({ email });
+      if (existingUser) {
+        console.warn("⚠ Duplicate email attempt:", email);
+        return res.status(400).json({ status: "fail", message: "Email already registered" });
+      }
 
       // Create user (no password required yet)
       const user = await User.create({
@@ -50,46 +50,46 @@ const volunteerController = {
         email,
         phone,
         role: 'volunteer',
-        password 
+        password
       });
 
-    // Handle optional file
-    let idProof = null;
-    if (req.file) {
-      idProof = {
-        url: req.file.path || req.file.secure_url,
-        publicId: req.file.filename || req.file.public_id,
-        docType: idProofType || "aadhaar", 
-        mimeType: req.file.mimetype
-      };
+      // Handle optional file
+      let idProof = null;
+      if (req.file) {
+        idProof = {
+          url: req.file.path || req.file.secure_url,
+          publicId: req.file.filename || req.file.public_id,
+          docType: idProofType || "aadhaar",
+          mimeType: req.file.mimetype
+        };
+      }
+      console.log("➡ Final idProof object:", idProof);
+
+      // Create volunteer record
+      const volunteer = await Volunteer.create({
+        userId: user._id,
+        skills,
+        causesOfInterest: causes,
+        location,
+        availability,
+        experience,
+        motivation,
+        status: "pending_review",
+        ...(idProof && { idProof })
+      });
+
+      res.status(201).json({
+        status: "success",
+        message: "Volunteer registered successfully",
+        data: { volunteer }
+      });
+
+    } catch (error) {
+      console.error("❌ registerVolunteer error message:", error.message);
+      console.error("❌ registerVolunteer error stack:", error.stack);
+      res.status(500).json({ status: "error", message: error.message });
     }
-    console.log("➡ Final idProof object:", idProof);
-
-    // Create volunteer record
-    const volunteer = await Volunteer.create({
-      userId: user._id,
-      skills,
-      causesOfInterest: causes,
-      location,
-      availability,
-      experience,
-      motivation,
-      status: "pending_review",
-      ...(idProof && { idProof })
-    });
-
-    res.status(201).json({
-      status: "success",
-      message: "Volunteer registered successfully",
-      data: { volunteer }
-    });
-
-  } catch (error) {
-    console.error("❌ registerVolunteer error message:", error.message);
-    console.error("❌ registerVolunteer error stack:", error.stack);
-    res.status(500).json({ status: "error", message: error.message });
-  }
-},
+  },
   // Get volunteer profile
   getVolunteerProfile: async (req, res) => {
     try {
@@ -188,6 +188,28 @@ const volunteerController = {
     }
   },
 
+  getMyProfile: async (req, res) => {
+    try {
+      const me = await Volunteer.findOne({ user: req.user.id })
+        .populate('user', 'name email phone');
+
+      if (!me) {
+        return res.status(404).json({
+          status: 'error',
+          message: 'Volunteer not found'
+        });
+      }
+
+      res.status(200).json({
+        status: 'success',
+        data: { volunteer: me }
+      });
+    } catch (error) {
+      console.error("❌ getMyProfile error:", error);
+      res.status(500).json({ status: 'error', message: error.message });
+    }
+  },
+
   // ========================
   // Core Admin routes
   // ========================
@@ -268,34 +290,34 @@ const volunteerController = {
       res.status(500).json({ status: 'error', message: error.message });
     }
   },
-  
+
   // Approve or reject volunteer
-updateVolunteerStatus: async (req, res) => {
-  try {
-    const { status } = req.body; // expected 'approved' or 'rejected'
-    if (!['approved', 'rejected'].includes(status)) {
-      return res.status(400).json({ status: 'fail', message: 'Invalid status value' });
+  updateVolunteerStatus: async (req, res) => {
+    try {
+      const { status } = req.body; // expected 'approved' or 'rejected'
+      if (!['approved', 'rejected'].includes(status)) {
+        return res.status(400).json({ status: 'fail', message: 'Invalid status value' });
+      }
+
+      const volunteer = await Volunteer.findByIdAndUpdate(
+        req.params.id,
+        { status },
+        { new: true, runValidators: true }
+      );
+
+      if (!volunteer) {
+        return res.status(404).json({ status: 'fail', message: 'Volunteer not found' });
+      }
+
+      res.status(200).json({
+        status: 'success',
+        message: `Volunteer status updated to ${status}`,
+        data: { volunteer }
+      });
+    } catch (error) {
+      res.status(500).json({ status: 'error', message: error.message });
     }
-
-    const volunteer = await Volunteer.findByIdAndUpdate(
-      req.params.id,
-      { status },
-      { new: true, runValidators: true }
-    );
-
-    if (!volunteer) {
-      return res.status(404).json({ status: 'fail', message: 'Volunteer not found' });
-    }
-
-    res.status(200).json({
-      status: 'success',
-      message: `Volunteer status updated to ${status}`,
-      data: { volunteer }
-    });
-  } catch (error) {
-    res.status(500).json({ status: 'error', message: error.message });
   }
- }
 };
 
 
